@@ -60,7 +60,19 @@ import modal
 APP_NAME = "grpo-vlm-modality-shift-verl"
 
 image = modal.Image.from_registry(
-    "verlai/verl:vllm011.latest",
+    # Fourth real bug (2026-08-10): vllm011.latest (vllm 0.11.0) is too
+    # old for veRL's LoRA+vLLM-rollout code path, which imports
+    # get_vllm_max_lora_rank -> raises "vllm version 0.11.0 not
+    # supported... Currently supported vllm versions are 0.18.0+" - a
+    # real, structural version mismatch, not a config mistake (the whole
+    # rest of the config parsed cleanly under Hydra first, including the
+    # one previously-uncertain flag, algorithm.norm_adv_by_std_in_grpo).
+    # This project's earlier verl_smoke_test() never caught it because it
+    # never exercised the LoRA+vLLM-rollout combination specifically
+    # (only `import verl` + CLI --help). Switched to the newest tag with
+    # a high-enough vllm (checked real available tags on Docker Hub,
+    # not guessed): vllm024.dev2 (vllm 0.24.x).
+    "verlai/verl:vllm024.dev2",
     # No add_python: this image already ships Python + torch + vllm + verl
     # pre-installed. Passing add_python would risk adding a SECOND,
     # separate Python installation that can't see any of those
@@ -91,9 +103,53 @@ image = modal.Image.from_registry(
     # "pip3 install --no-deps -e ." command exactly.
     "git clone https://github.com/volcengine/verl /opt/verl",
     "cd /opt/verl && pip3 install --no-deps -e .",
+    # Sixth real bug (2026-08-10), found by reading veRL's actual source
+    # (verl/models/transformers/qwen2_vl.py, _get_input_embeds), not
+    # guessed: for text-only training (no image - exactly this project's
+    # entire training design), veRL runs a deliberate, documented trick to
+    # keep FSDP happy about the vision tower's parameters being "used" in
+    # every forward pass even when there's no real image - it builds a
+    # tiny all-zero dummy image, runs it through the real vision encoder,
+    # and adds `0.0 * image_embeds.mean()` to the text embeddings (multiply
+    # by exactly zero: touches the parameters for FSDP's gradient sync,
+    # changes nothing numerically). That line assumes model.visual(...)
+    # returns a raw tensor. A live run instead crashed with
+    # "'BaseModelOutputWithPooling' object has no attribute 'mean'" -
+    # confirming the installed transformers version's vision-tower forward
+    # now returns a wrapped output object instead of a bare tensor, a real
+    # version mismatch between veRL's patch (written against older
+    # transformers behavior) and what's actually installed here. NOT
+    # caused by use_fused_kernels or entropy_from_logits_with_chunking (an
+    # initial, unverified guess ruled out by reading the actual source
+    # before touching either flag). Patched in-place, minimally: unwrap
+    # .last_hidden_state if present, otherwise use the tensor as-is - works
+    # regardless of which behavior the installed transformers version has.
+    'sed -i \'s/0\\.0 \\* image_embeds\\.mean()/0.0 * (image_embeds.last_hidden_state if hasattr(image_embeds, "last_hidden_state") else image_embeds).mean()/\' /opt/verl/verl/models/transformers/qwen2_vl.py',
+    # Seventh real bug (2026-08-10), found by an isolated verification
+    # test (scripts/verify_qwen2vl_patch_on_modal.py) built specifically
+    # to check the sixth fix actually worked before paying for another
+    # full training run - it did apply, but surfaced a SEPARATE, real
+    # issue one line earlier: `model.visual(...)` itself raised
+    # "'Qwen2_5_VLForConditionalGeneration' object has no attribute
+    # 'visual'". Direct introspection of the real loaded model (not
+    # guessed) confirmed: the vision tower lives at model.model.visual in
+    # the installed transformers version, not model.visual - veRL's patch
+    # was written against an older transformers release where it was one
+    # level shallower (a real HF class-hierarchy refactor, the same class
+    # of drift as the .mean() fix above, just one attribute earlier in the
+    # same line). Same defensive-fallback approach: try the shallow path
+    # first, fall back to the nested one.
+    'sed -i \'s/image_embeds = model\\.visual(pixel_values, grid_thw=image_grid_thw)/image_embeds = (model.visual if hasattr(model, "visual") else model.model.visual)(pixel_values, grid_thw=image_grid_thw)/\' /opt/verl/verl/models/transformers/qwen2_vl.py',
 ).add_local_python_source("src", "configs")
 
 app = modal.App(APP_NAME, image=image)
+
+# Same model ID as every other environment in this project
+# (configs/modal_app.py, configs/modal_app_unsloth.py) - not previously
+# needed here since verl_smoke_test() only checks imports/CLI --help, not
+# an actual model load. Added for scripts/run_verl_dry_run_on_modal.py,
+# which does load the real model.
+MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
 
 model_cache = modal.Volume.from_name("grpo-vlm-model-cache", create_if_missing=True)
 MODEL_CACHE_DIR = "/cache/huggingface"
