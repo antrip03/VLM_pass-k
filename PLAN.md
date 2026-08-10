@@ -114,7 +114,7 @@ Framed as *measuring a quantity* (how much of Δ_text survives as Δ_pixel), not
 4. Run a **tiny GRPO/Dr. GRPO training pass**: ~20–30 steps, small group size, just to confirm the training loop runs, rewards compute correctly, and loss moves in a sane direction.
 5. Run a **tiny eval pass**: ~10 problems, n=5 samples, both text and image mode, confirm generation, answer extraction (regex on GSM8K's `#### number` format), and pass@k computation all work without errors.
 6. **Timing calibration**: measure real tokens/sec on the actual hardware being used — do not trust the estimates in §9 blindly; use them as priors, confirm with ~15 minutes of real measurement.
-7. **Truncation check** at the 500-token cap: confirm truncation rate is low (<5%) on this small sample before scaling up.
+7. **Truncation check** at the 1200-token cap: confirm truncation rate is low (<5%) on this small sample before scaling up.
 
 **Exit criterion**: all of the above run cleanly, pass@16 > pass@1 by a meaningful margin on text mode, and timing roughly matches the estimates in §9. Only then proceed to Phase 1.
 
@@ -123,13 +123,13 @@ Framed as *measuring a quantity* (how much of Δ_text survives as Δ_pixel), not
 1. **Algorithm**: Dr. GRPO (not vanilla GRPO, not CISPO — see §7 for why).
 2. **Training data**: text-only math problems (GSM8K training split or similar), never images.
 3. **LoRA**: adapters on LLM decoder layers only; vision encoder + projector excluded from `target_modules` and frozen.
-4. **Seeds**: minimum 2, **target 3** (seeds e.g. 0, 999, 2026 — matches real precedent in GRPO literature). This addresses the well-documented seed-variance problem in RLVR training (confirmed: seed changes alone can shift pass@1 by several points on comparably-sized benchmarks).
+4. **Seeds**: 1 (single training run, seed 0). A single-seed design trades away characterizing seed-to-seed variance (a real, documented effect in RLVR training — seed changes alone can shift pass@1 by several points on comparably-sized benchmarks) for a much smaller compute/time footprint. Deliberate scope decision, recorded explicitly as a named limitation in §10 item 8.
 5. **Step budget**: target 300–400 steps, hard ceiling 500. Checkpoint every 100 steps, evaluate text-mode pass@1 at each checkpoint, stop early if plateaued across 2–3 consecutive checkpoints. (Evidence: DeepSeek Math used ~500 steps; other studies find a ~100–200 step sweet spot; risk of collapse starts appearing ~1,500 steps without careful reward shaping.)
-6. **Generation cap**: 500 tokens (standardized across training and eval — sufficient for GSM8K-level reasoning). **Truncation-rate check mandatory**: measure % of generations hitting the cap without an extracted answer, separately per condition/model. If truncation is asymmetric (RL model truncating more than base — a length-drift symptom), raise the cap and re-run before trusting results. (Dr. GRPO's length-bias fix directly reduces this risk — see §7.)
-7. **Manipulation check**: confirm vision encoder + projector weights are byte-identical before/after training, for every seed. Report this explicitly.
-8. **Statistical treatment**: compute Δ_text and Δ_pixel **per seed first** (each with its own within-checkpoint bootstrap CI), then report the mean and spread **across** the 3 per-seed deltas as the headline result. Do not naively pool all seeds' samples into one bootstrap — that understates real uncertainty, since between-seed variance is typically larger than within-checkpoint sampling variance.
+6. **Generation cap**: 1200 tokens (standardized across training and eval). Real measured natural completion length on this exact model, now covering all three conditions, not just text (2026-08-10, `scripts/check_natural_generation_length.py` then the larger `scripts/expanded_length_check_tde.py`, 280 real generations across T/D_transcribe/D_solve/E): T max 582, D_solve max 606, E max 615 - the highest value observed anywhere across every condition was 615 tokens, with a 2200-token generous cap never once hit. 1200 leaves comfortable margin (nearly 2x the observed max) while costing meaningfully less than the earlier 2000-token setting, given actual generation length - not the cap - drives compute cost (see the earlier real-throughput analysis: raising the cap only matters for the fraction of generations it would otherwise truncate). **Truncation-rate check mandatory**: measure % of generations hitting the cap without an extracted answer, separately per condition/model. If truncation is asymmetric (RL model truncating more than base - a length-drift symptom), raise the cap and re-run before trusting results. (Dr. GRPO's length-bias fix directly reduces this risk - see §7.) Real VRAM/throughput measurements taken at a 2000-token cap (`scripts/vram_smoke_test_2000cap.py`, `scripts/timing_calibration_2000cap.py`) remain representative at 1200: actual generated lengths in those real runs (438-562 tokens) never approached even 1200, so the cap value itself wasn't the limiting factor - only the finding it produced is: naive full-batch training OOMs on a single 40GB A100 (the LM head's vocab-size logits tensor, not KV cache, is the bottleneck) - confirmed a training micro-batch of 4 is the ceiling; training must use gradient accumulation to reach any larger effective batch size, not a single large batch.
+7. **Manipulation check**: confirm vision encoder + projector weights are byte-identical before/after training. Report this explicitly.
+8. **Statistical treatment**: compute Δ_text and Δ_pixel from the single seed's results, with a bootstrap/Bayesian CI on each Δ (§4 item 8) to quantify within-checkpoint sampling uncertainty. This CI reflects sampling noise only, not seed-to-seed variance (there is only one seed) — report it as such, not as a full uncertainty bound on "would another training run reproduce this."
 
-**Compute estimate (3 seeds, 300 steps, A100 40GB)**: training ≈ 11.25–17.4 hr, eval ≈ 1–2.75 hr — **total ≈ 12–20 hr, ≈ $18–$60**. (Full table in §9.)
+**Compute estimate (1 seed, 300–400 steps, 1200-token cap, A100 40GB, from real Modal-measured throughput at a 2000-token cap - see the note in item 6 above on why these figures remain representative - `scripts/vram_smoke_test_2000cap.py` and `scripts/timing_calibration_2000cap.py`)**: training ≈ 6.7–17.8 hr (range depends on prompts-per-step, not yet fixed — see §9.2), eval ≈ 3.6 hr (both base and RL checkpoint) — **total ≈ 10.3–21.4 hr, ≈ $38–$80**. (Full table in §9.)
 
 ### Phase 2 — Second Model(s), Budget-Contingent
 
@@ -139,7 +139,7 @@ Only proceed here once Phase 1 produces a real, seed-validated Δ_text (i.e., th
 
 - **Purpose**: does the effect hold at a larger size within the *same* architecture family? Cleanest possible generalization check (no cross-family confound).
 - **Risk**: memory is genuinely tight on a single 24GB GPU (L4) — real evidence found of instability (NaN gradients, zero rollout scores) attempting Qwen2.5-VL-7B GRPO on a 24GB-class GPU (A10). **Recommendation: run 7B on A100 40GB, not L4** — fits comfortably with plain LoRA there, no QLoRA needed.
-- **Scope**: full 3-seed treatment if budget allows (≈$18–$60 more, matching 3B's cost profile scaled ~2×); a single-seed spot-check if budget is tighter.
+- **Scope**: single-seed, matching the Phase 1 design (§3 Phase 1 item 4). Re-profile throughput at the 1200-token cap before committing compute — do not reuse 3B's numbers directly.
 
 #### 2B — Qwen3-VL-2B-Instruct (different-generation, different-pedigree check)
 
@@ -150,7 +150,7 @@ Only proceed here once Phase 1 produces a real, seed-validated Δ_text (i.e., th
 - **Architecture caveat**: Qwen3-VL uses a different vision encoder (SigLIP2-Large) than Qwen2.5-VL — any cross-model comparison is confounded with architecture, same caveat as any cross-family check.
 - **Outcome framing**: if 2B and 3B agree directionally — stronger, more general claim (robust across training pedigree, not just architecture). If they disagree — still a valid, arguably more interesting paper, reframed as "whether the effect holds depends on how the base model acquired its reasoning" — requires explicit discussion of the ceiling-effect / ownership-of-reasoning distinction, not presented as a clean failure.
 
-**Compute estimate (2B, 3 seeds, 300 steps, A100 40GB)**: ≈ 8.2–13.6 hr, ≈ $12–$41. (Full table in §9.)
+**Compute estimate (2B, 1 seed, 300 steps, A100 40GB)**: stale — the figure previously here (≈8.2–13.6 hr for 3 seeds at a 500-token cap) predates the 1-seed decision and the later 1200-token cap. Re-profile with real timing calibration (as done for 3B in §9.2) before committing compute, rather than dividing the old number by 3.
 
 ---
 
@@ -180,9 +180,9 @@ Only proceed here once Phase 1 produces a real, seed-validated Δ_text (i.e., th
 | 2 | pass@1(π_base, D/E), pass@1(π_RL, D/E) | Δ_pixel at each condition — the core novel measurement |
 | 3 | pass@k(π_base, T/D/E), pass@k(π_RL, T/D/E), k up to ≈64 | Whether RL expands raw coverage, or only reshuffles precision (the sharpening signature), in each modality |
 | 4 | Bootstrap/Bayesian CI on Δ_text, Δ_pixel, and their difference | Statistical validity — is the modality-shift effect real, not noise |
-| 5 | Per-seed Δ_text / Δ_pixel, then mean + spread across seeds | Whether the result is a property of RL training in general, or one lucky/unlucky run |
+| 5 | Δ_text / Δ_pixel from the single seed, with bootstrap CI | Quantifies within-checkpoint sampling uncertainty (not seed-to-seed variance — single-seed design, see §10 item 8) |
 | 6 | Transcription accuracy (Condition D) | Isolates pure perception error from reasoning error |
-| 7 | Truncation rate per condition/model | Rules out the 500-token cap as a hidden confound |
+| 7 | Truncation rate per condition/model | Rules out the 1200-token cap as a hidden confound |
 | 8 | Vision encoder + projector weight diff (before/after RL) | Confirms the manipulation ("text-only RL") was actually clean |
 | 9 | Perception-conditional / difficulty-matched / paraphrase-OOD subsets | Rules out perception-tax, baseline-level, and general-fragility alternative explanations |
 | 10 | Spot-checked reasoning traces (~30–50) | Rules out spurious correctness (right answer, wrong reasoning) inflating the numbers |
@@ -201,7 +201,7 @@ A good design lets you state, in advance, what every outcome means. All four bel
 | **C — Partial** | 0 < Δ_pixel < Δ_text, both significant and distinct | Some but not all of the gain transfers | Arguably the most realistic/useful outcome — gives a real *quantity* ("X% survives"), not a forced binary |
 | **D — Negative transfer** | Δ_pixel < 0 | RL actively hurts image-mode performance | Points to a distinct mechanism (narrow-distribution adapter interference, not pure sharpening) — connects to a different, also-interesting literature |
 
-**The only non-automatically-valuable outcome**: pure noise (CIs too wide to distinguish any of the above at the tested sample size). This is exactly why Phase 0's smoke test and the 3-seed design exist — to catch this cheaply before the full investment, not discover it after.
+**The only non-automatically-valuable outcome**: pure noise (CIs too wide to distinguish any of the above at the tested sample size). This is a real, sharper risk under the single-seed design (§3 Phase 1 item 4, §10 item 8) than it would be with multiple seeds — Phase 0's smoke test exists to catch obviously-broken setups cheaply before the full investment, but cannot substitute for the seed-variance check a multi-seed design would have provided.
 
 ---
 
@@ -276,32 +276,33 @@ A number sitting unanalyzed in someone else's baseline table is not the same as 
 | BF16 compute | ~121 TFLOPS | ~312 TFLOPS |
 | Typical cloud price | ~$0.20–$0.80/hr | ~$1.50–$3.00/hr |
 
-### 9.2 Training — 3 seeds, A100 40GB (assumptions: LoRA/Dr. GRPO, group size 8–16, 500-token cap)
+### 9.2 Training — 1 seed, A100 40GB, 1200-token cap
 
-| Model | 300 steps | 400 steps | 500 steps |
+Real measured throughput, not a blind estimate (2026-08-10, Qwen2.5-VL-3B, `scripts/timing_calibration_2000cap.py` + `scripts/vram_smoke_test_2000cap.py`, both run at a 2000-token cap but representative at 1200 too - see item 6 in §3 Phase 1): rollout = 864.8 tok/s aggregate at 64 concurrent sequences; training = 0.48s per micro-batch-of-4 step (4 is the confirmed VRAM ceiling at this response length on a single 40GB A100 — larger micro-batches OOM on the LM head's vocab-size logits tensor, not KV cache). Per-step time = (S/64)×32.42s [rollout] + (S/4)×0.48s [training], where S = prompts-per-step × group_size — not yet fixed (§12), shown below for two illustrative S values:
+
+| S (sequences/step) | 300 steps | 400 steps | 500 steps |
 |---|---|---|---|
-| 3B (Qwen2.5-VL-3B) | ~11.25–17.4 hr, ~$18–$60 | ~14.85–23.4 hr, ~$24–$78 | ~18.75–29.1 hr, ~$29–$91 |
-| 2B (Qwen3-VL-2B) | ~7.5–11.7 hr, ~$12–$41 | ~9.9–15.6 hr, ~$16–$52 | ~— (not typically needed given 2B's likely lower headroom) |
-| 7B (Qwen2.5-VL-7B) | ~22.5–35.1 hr, ~$36–$120 | ~29.7–46.8 hr, ~$48–$156 | ~37.5–58.2 hr, ~$60–$195 |
+| 128 | 6.7 hr, ~$25 | 8.9 hr, ~$33 | 11.1 hr, ~$41 |
+| 256 | 13.4 hr, ~$50 | 17.8 hr, ~$66 | 22.3 hr, ~$83 |
 
-(2B and 3B single-seed/single-step-count figures, plus the L4 comparison table, are in the earlier working notes — this table reflects the finalized 3-seed decision.)
+2B/7B rows removed: Phase 2 is budget-contingent and decided only after Phase 1 (§3.4). The old 500-token-cap estimates that used to be here are stale now that 3B has been re-profiled - re-run the same real timing-calibration approach for whichever model is actually pursued in Phase 2, rather than reuse a blind estimate.
 
-### 9.3 Evaluation (per seed, all 3 conditions T/D/E, n≈128, A100 40GB)
+### 9.3 Evaluation — 1 seed, both checkpoints (base + RL), all 3 conditions T/D/E, n≈128, 1200-token cap, A100 40GB
 
-| Model | Estimated time | Estimated cost |
+Real measured rollout throughput (864.8 tok/s aggregate, §9.2) applied to: eval_problems × n(128) × call_units(T=1, D=2, E=1 → 4 total) × avg_completion_tokens(438, real measured natural length, §9.2). eval_problems is not fixed in this plan (§12) — the figure below uses 25 (matches this project's own headroom-check precedent, `scripts/run_headroom_check_on_modal.py`), not a locked decision:
+
+| Model | Estimated time (25 eval problems, both checkpoints) | Estimated cost |
 |---|---|---|
-| 3B | ~0.9–2.5 hr | ~$1.4–$7.5 |
-| 2B | ~0.6–1.7 hr | ~$0.9–$5.1 |
-| 7B | ~1.6–4.6 hr | ~$2.4–$13.8 |
+| 3B (Qwen2.5-VL-3B) | ~3.6 hr | ~$13 |
 
-(Scaled ~1.6–2× from the original two-condition estimate to account for Condition D's extra generation call.)
+2B/7B rows removed for the same reason as §9.2.
 
 ### 9.4 Recommended sequencing
 
 1. Phase 0 (3B smoke test): trivial cost, <1 hour of actual compute.
-2. Phase 1 (3B, 3 seeds, 300–400 steps): **~12–24 hr total, ~$20–$85** — the core, load-bearing result.
-3. Phase 2A (7B, if budget allows): run on **A100 40GB, not L4** (confirmed real instability risk on 24GB-class GPUs at this model size).
-4. Phase 2B (2B, if budget allows): run the mandatory headroom pre-check first (near-zero cost), then proceed only if it passes.
+2. Phase 1 (3B, 1 seed, 300–400 steps, 1200-token cap): **~10.3–21.4 hr total, ~$38–$80** (real-throughput-based, §9.2+§9.3) — the core, load-bearing result.
+3. Phase 2A (7B, if budget allows): run on **A100 40GB, not L4** (confirmed real instability risk on 24GB-class GPUs at this model size). Re-profile throughput at the 1200-token cap before committing compute — do not reuse the old 500-token-cap estimate.
+4. Phase 2B (2B, if budget allows): run the mandatory headroom pre-check first (near-zero cost), then proceed only if it passes. Re-profile throughput at the 1200-token cap before committing compute.
 
 ---
 
@@ -314,7 +315,7 @@ A number sitting unanalyzed in someone else's baseline table is not the same as 
 5. **Frame the contribution honestly**: *"testing whether the pass@1/pass@k signature generalizes across modality"*, not *"proving sharpening is/isn't true"* — the underlying methodology (pass@k as a capability-boundary proxy) is itself actively contested in the literature (arXiv 2511.16231, 2607.20543), so claim only what the design can actually support.
 6. **Name the adapter-transfer-failure alternative explicitly in Limitations** — a LoRA update trained only on text-shaped inputs could fail to transfer to image-conditioned inputs for reasons unrelated to sharpening (narrow-distribution interference). A collapse result is *consistent with* representation-bound sharpening, not proof of it, unless this alternative is explicitly discussed.
 7. **Scope every claim to the tested model(s)** — do not generalize beyond what was actually run; this mechanism is plausibly architecture-dependent by its nature (vision-language calibration quality could change the outcome independent of the "true" sharpening question).
-8. **Minimum 2, target 3 seeds** for the core (3B) result — non-negotiable given documented seed-variance effects of several percentage points in comparable LLM-reasoning RL settings.
+8. **Single-seed result (3B)** — a deliberate scope decision (§3 Phase 1 item 4), not the original multi-seed design. Report this explicitly as a limitation: the reported Δ_text/Δ_pixel reflect one training run's sampling-level uncertainty (via bootstrap CI, item 4 above) but cannot characterize seed-to-seed variance, which is documented to shift pass@1 by several percentage points in comparable LLM-reasoning RL settings. State this plainly in the paper's limitations section rather than implying the CI covers it.
 
 ---
 
@@ -328,6 +329,7 @@ A number sitting unanalyzed in someone else's baseline table is not the same as 
 ## 12. Open Questions / Next Decisions for the Team
 
 - Final LoRA hyperparameters (rank, target modules, learning rate) and Dr. GRPO settings (group size, KL coefficient) — decide before Phase 0.
+- Prompts-per-training-step (train_batch_size), eval-problem-count, and ppo_epochs — not yet fixed; §9's compute estimates are given as a function of these (§9.2/§9.3), not a single number, until they're decided.
 - Workshop target and deadline — determines how much of §10's checklist is feasible in the available time (priority order if constrained: manipulation check → perception-conditional/D-condition → confidence intervals → paraphrase OOD control → spurious-correctness spot check).
 - Whether to pursue Phase 2A (7B), Phase 2B (2B), both, or neither — decide **after** Phase 1 results are in, not before.
 - Re-run the novelty check (§8) close to submission.
