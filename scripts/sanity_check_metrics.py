@@ -15,7 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.controls.headroom_check import check_headroom
 from src.metrics.answer_extraction import extract_model_answer, is_correct
+from src.metrics.bootstrap_ci import bootstrap_delta_ci, bootstrap_pass_at_k_ci
 from src.metrics.pass_at_k import mean_pass_at_k, pass_at_k
+from src.metrics.transcription_fidelity import (
+    character_level_similarity,
+    is_exact_transcription_match,
+    mean_transcription_fidelity,
+)
 
 
 def main() -> None:
@@ -146,6 +152,93 @@ def main() -> None:
         failures.append("Expected ValueError for empty results_per_problem")
     except ValueError:
         print("  empty input correctly raises ValueError")
+
+    print("\n=== 7. bootstrap_pass_at_k_ci ===")
+    # Zero-variance case: every problem identical (10/10 correct) -> every
+    # bootstrap resample is also 10/10 correct, so the CI must collapse
+    # to exactly the point estimate (no spread possible).
+    zero_var_results = [(10, 10)] * 20
+    ci = bootstrap_pass_at_k_ci(zero_var_results, k=1, n_bootstrap=500, seed=0)
+    print(f"  zero-variance case -> {ci} (expect point/lower/upper all 1.0)")
+    if not (abs(ci["point_estimate"] - 1.0) < 1e-9 and abs(ci["ci_lower"] - 1.0) < 1e-9 and abs(ci["ci_upper"] - 1.0) < 1e-9):
+        failures.append(f"bootstrap_pass_at_k_ci zero-variance case failed: {ci}")
+
+    # Mixed case: half the problems always correct, half always wrong.
+    # Point estimate must be exactly 0.5 (deterministic mean); the CI
+    # must have real width (not collapse to a point) and must bracket 0.5.
+    mixed_results = [(10, 10)] * 10 + [(10, 0)] * 10
+    ci2 = bootstrap_pass_at_k_ci(mixed_results, k=1, n_bootstrap=2000, seed=0)
+    print(f"  mixed case -> {ci2} (expect point=0.5, lower<0.5<upper)")
+    if abs(ci2["point_estimate"] - 0.5) > 1e-9:
+        failures.append(f"bootstrap_pass_at_k_ci mixed-case point estimate wrong: {ci2}")
+    if not (ci2["ci_lower"] < 0.5 < ci2["ci_upper"]):
+        failures.append(f"bootstrap_pass_at_k_ci mixed-case CI should bracket 0.5: {ci2}")
+
+    print("\n=== 8. bootstrap_delta_ci ===")
+    # Identical A and B (same list object even) -> every paired resample
+    # gives delta=0 exactly, so the CI must collapse to [0, 0] and NOT be
+    # flagged significant (there is no real difference to detect).
+    identical = [(10, 5)] * 15
+    delta_ci_same = bootstrap_delta_ci(identical, identical, k=1, n_bootstrap=500, seed=0)
+    print(f"  identical A/B -> {delta_ci_same} (expect point/lower/upper all 0.0, significant=False)")
+    if not (
+        abs(delta_ci_same["point_estimate"]) < 1e-9
+        and abs(delta_ci_same["ci_lower"]) < 1e-9
+        and abs(delta_ci_same["ci_upper"]) < 1e-9
+    ):
+        failures.append(f"bootstrap_delta_ci identical-inputs case failed: {delta_ci_same}")
+    if delta_ci_same["significant"]:
+        failures.append(f"bootstrap_delta_ci identical inputs should not be significant: {delta_ci_same}")
+
+    # Maximally, uniformly different A (always correct) vs B (always
+    # wrong) -> zero variance again, delta collapses to exactly 1.0, and
+    # this real difference MUST be flagged significant.
+    all_correct = [(10, 10)] * 15
+    all_wrong = [(10, 0)] * 15
+    delta_ci_diff = bootstrap_delta_ci(all_correct, all_wrong, k=1, n_bootstrap=500, seed=0)
+    print(f"  maximally different A/B -> {delta_ci_diff} (expect point/lower/upper all 1.0, significant=True)")
+    if abs(delta_ci_diff["point_estimate"] - 1.0) > 1e-9:
+        failures.append(f"bootstrap_delta_ci max-difference point estimate wrong: {delta_ci_diff}")
+    if not delta_ci_diff["significant"]:
+        failures.append(f"bootstrap_delta_ci max-difference case should be significant: {delta_ci_diff}")
+
+    try:
+        bootstrap_delta_ci([(10, 5)] * 5, [(10, 5)] * 3, k=1)  # mismatched lengths
+        failures.append("Expected ValueError for mismatched results_a/results_b lengths")
+    except ValueError:
+        print("  mismatched-length inputs correctly raise ValueError")
+
+    print("\n=== 9. transcription_fidelity ===")
+    # Exact match after normalization - including the real curly-quote
+    # character GSM8K questions actually contain ("Janet's ducks..."),
+    # not a synthetic example.
+    if not is_exact_transcription_match("Janet’s ducks lay 16 eggs", "janet's ducks lay 16 eggs"):
+        failures.append("is_exact_transcription_match should normalize curly quotes + case")
+    if not is_exact_transcription_match("  Extra   whitespace   here  ", "Extra whitespace here"):
+        failures.append("is_exact_transcription_match should normalize whitespace")
+    if is_exact_transcription_match("The robe needs 2 bolts", "The robe needs 3 bolts"):
+        failures.append("is_exact_transcription_match should NOT match genuinely different text")
+    print("  exact-match normalization (curly quotes, whitespace, real mismatch) all correct")
+
+    sim_identical = character_level_similarity("same text here", "same text here")
+    if abs(sim_identical - 1.0) > 1e-9:
+        failures.append(f"character_level_similarity of identical strings should be 1.0, got {sim_identical}")
+    sim_one_char_off = character_level_similarity("the answer is 18", "the answer is 19")
+    print(f"  one-digit-off similarity -> {sim_one_char_off} (expect high but < 1.0)")
+    if not (0.9 < sim_one_char_off < 1.0):
+        failures.append(f"character_level_similarity for a 1-char difference looked wrong: {sim_one_char_off}")
+
+    fidelity_pairs = [
+        ("Janet's ducks lay 16 eggs", "Janet's ducks lay 16 eggs"),  # exact
+        ("A robe needs 2 bolts of blue fiber", "A robe needs 2 bolts of red fiber"),  # close but wrong
+        ("completely unrelated text", "Josh buys a house for $80,000"),  # unrelated
+    ]
+    fidelity = mean_transcription_fidelity(fidelity_pairs)
+    print(f"  mean_transcription_fidelity over 3 pairs (1 exact, 2 not) -> {fidelity}")
+    if abs(fidelity["exact_match_rate"] - (1 / 3)) > 1e-9:
+        failures.append(f"mean_transcription_fidelity exact_match_rate wrong: {fidelity}")
+    if fidelity["n_samples"] != 3:
+        failures.append(f"mean_transcription_fidelity n_samples wrong: {fidelity}")
 
     print("\n=== SUMMARY ===")
     if failures:
