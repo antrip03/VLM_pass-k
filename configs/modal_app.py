@@ -44,18 +44,40 @@ MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
 # reproducibility; the same principle applies to the environment itself, not
 # just the training algorithm).
 # ---------------------------------------------------------------------------
-image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "torch==2.5.1",
-    "torchvision==0.20.1",  # must match torch==2.5.1 per PyTorch's compatibility
-    # matrix; required by qwen_vl_utils.vision_process, which imports it
-    # internally - missing on the first run, caught by the live smoke test.
-    "transformers==4.49.0",
-    "accelerate==1.2.1",
-    "peft==0.14.0",
-    "qwen-vl-utils==0.0.8",
-    "pillow==11.0.0",
-    "huggingface_hub==0.27.0",
-    "einops==0.8.0",
+image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install(
+        "fonts-dejavu-core",  # provides /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf,
+        # the fixed font src/data/render.py requires for reproducible GSM8K
+        # image rendering (PLAN.md Section 11) - added here so the Modal
+        # container actually has it, not just referenced by a path that
+        # happens to not exist (same class of bug as the missing
+        # torchvision dependency caught in Step 1).
+    )
+    .pip_install(
+        "torch==2.5.1",
+        "torchvision==0.20.1",  # must match torch==2.5.1 per PyTorch's compatibility
+        # matrix; required by qwen_vl_utils.vision_process, which imports it
+        # internally - missing on the first run, caught by the live smoke test.
+        "transformers==4.49.0",
+        "accelerate==1.2.1",
+        "peft==0.14.0",
+        "qwen-vl-utils==0.0.8",
+        "pillow==11.0.0",
+        "huggingface_hub==0.27.0",
+        "einops==0.8.0",
+        "datasets==3.2.0",  # GSM8K loading (src/data/gsm8k_loader.py)
+    )
+    .add_local_python_source("src", "configs")
+    # Makes both packages importable inside the remote container (added to
+    # /root, which is on PYTHONPATH there) - not just data files on disk.
+    # `configs` must be included too: any script that does
+    # `from configs.modal_app import app, image` needs that import to
+    # resolve when Modal re-executes the calling module's top-level code
+    # remotely to locate the function object, not just when run locally.
+    # (add_local_dir was tried first and is wrong for this - it stages
+    # files but doesn't reliably make them importable as Python packages;
+    # add_local_python_source is the API meant for exactly this.)
 )
 
 app = modal.App(APP_NAME, image=image)

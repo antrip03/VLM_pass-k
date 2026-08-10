@@ -45,6 +45,9 @@ data/processed/
 data/cache/
 *.gguf
 
+# Local debug/validation artifacts (rendered images, one-off script output)
+scratch/
+
 # Experiment tracking / logs
 wandb/
 logs/
