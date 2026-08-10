@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model checkpoints, weights, and data — never commit
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.ckpt
+checkpoints/
+outputs/
+data/raw/
+data/processed/
+data/cache/
+*.gguf
+
+# Experiment tracking / logs
+wandb/
+logs/
+*.log
+runs/
+mlruns/
+
+# Modal
+.modal/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
