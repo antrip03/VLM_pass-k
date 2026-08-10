@@ -12,23 +12,25 @@ WHAT THIS FILE DOES NOT DO YET (later steps, per PLAN.md Section 3):
 This file only proves the environment + model loading + generation
 pathway works, in both text and (synthetic) image mode.
 
-VERIFICATION STATUS - READ BEFORE TRUSTING THIS FILE:
-  This was written without a Modal account/credentials available in the
-  authoring environment, so it has NOT been executed against live Modal
-  infrastructure. Syntax was checked locally (py_compile) but nothing
-  beyond that. Before relying on it:
-    1. Run `modal run configs/modal_app.py` yourself and confirm smoke_test()
-       actually passes on real hardware.
-    2. Double-check the package pins below against what's actually
-       available/compatible today - they reflect versions the author is
-       confident existed as of their training data (cutoff ~Jan 2026);
-       transformers' Qwen-VL support moves fast, confirm before trusting.
-    3. Double-check the Modal GPU string identifiers ("A10G", "A100-40GB")
-       against Modal's current docs - naming has changed before.
-    4. Double-check the transformers class name
-       (Qwen2_5_VLForConditionalGeneration) and the qwen_vl_utils API
-       (process_vision_info) against the installed package versions.
-  Treat this as a well-reasoned first draft, not a validated artifact.
+VERIFICATION STATUS:
+  Confirmed PASSING on live Modal infrastructure (A10G) on 2026-08-10:
+  GPU detected (NVIDIA A10), image built cleanly, model + processor loaded
+  in ~170s (dominated by the first-time ~7-8GB weight download), both
+  text-mode and image-mode generation succeeded and both answered the
+  smoke-test arithmetic question correctly. Run: https://modal.com/apps/guneesh-g/main/ap-DKBKc0P32djsjB04tiYy2J
+
+  One real bug was caught and fixed by this run: qwen_vl_utils.vision_process
+  imports torchvision internally, which was missing from the original pins
+  (only torch was listed) - added torchvision==0.20.1 (matching torch==2.5.1
+  per PyTorch's compatibility matrix) to fix it. A separate, cosmetic issue
+  (Windows console can't render the Modal CLI's Unicode checkmark output)
+  was worked around by running with PYTHONIOENCODING=utf-8 - not a bug in
+  this file, but worth knowing if `modal run` appears to crash immediately
+  with a charmap encoding error on Windows.
+
+  Still not independently re-verified: the exact package version pins
+  beyond what this run exercised, and the A100-40GB GPU path (unused by
+  this smoke test, reserved for Step 5's training script).
 """
 
 import modal
@@ -44,6 +46,9 @@ MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
 # ---------------------------------------------------------------------------
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
     "torch==2.5.1",
+    "torchvision==0.20.1",  # must match torch==2.5.1 per PyTorch's compatibility
+    # matrix; required by qwen_vl_utils.vision_process, which imports it
+    # internally - missing on the first run, caught by the live smoke test.
     "transformers==4.49.0",
     "accelerate==1.2.1",
     "peft==0.14.0",
