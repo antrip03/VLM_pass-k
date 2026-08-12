@@ -130,7 +130,7 @@ Framed as *measuring a quantity* (how much of Δ_text survives as Δ_pixel), not
 8. **Manipulation check**: confirm vision encoder + projector weights are byte-identical before/after training. Report this explicitly.
 9. **Statistical treatment**: compute Δ_text and Δ_pixel from the single seed's results, with a bootstrap/Bayesian CI on each Δ (§4 item 8) to quantify within-checkpoint sampling uncertainty. This CI reflects sampling noise only, not seed-to-seed variance (there is only one seed) — report it as such, not as a full uncertainty bound on "would another training run reproduce this."
 
-**Compute estimate (1 seed, 500 steps, S=128 sequences/step, 1200-token cap, A100 40GB, from real Modal-measured throughput at a 2000-token cap - see the note in item 7 above on why these figures remain representative - `scripts/vram_smoke_test_2000cap.py` and `scripts/timing_calibration_2000cap.py`)**: training ≈ 11.1 hr, ~$41 (§9.2 table, S=128 row, 500 steps) + eval ≈ 3.6 hr, ~$13 (§9.3, 25 eval problems — still not locked, see §12) — **total ≈ 14.7 hr, ≈ $54**. This is the now-concrete Phase 1 figure per the locked group size (8) / prompts-per-step (16) / step count (500) decisions above; still pending real-veRL calibration (not the raw-HF proxy this is based on) per the optimization discussion above the batch-shape item.
+**Compute estimate (1 seed, 500 steps, S=128 sequences/step, 1200-token cap, A100 40GB, from real Modal-measured throughput at a 2000-token cap - see the note in item 7 above on why these figures remain representative - `scripts/vram_smoke_test_2000cap.py` and `scripts/timing_calibration_2000cap.py`)**: training ≈ 11.1 hr, ~$41 (§9.2 table, S=128 row, 500 steps) + eval ≈ 7.2 hr, ~$26 (§9.3, 50 eval problems, locked) — **total ≈ 18.3 hr, ≈ $67**. This is the now-concrete Phase 1 figure per the locked group size (8) / prompts-per-step (16) / step count (500) / eval-problem-count (50) decisions above; still pending real-veRL calibration (not the raw-HF proxy this is based on) per the optimization discussion above the batch-shape item.
 
 ### Phase 2 — Second Model(s), Budget-Contingent
 
@@ -290,18 +290,20 @@ Real measured throughput, not a blind estimate (2026-08-10, Qwen2.5-VL-3B, `scri
 
 ### 9.3 Evaluation — 1 seed, both checkpoints (base + RL), all 3 conditions T/D/E, n≈128, 1200-token cap, A100 40GB
 
-Real measured rollout throughput (864.8 tok/s aggregate, §9.2) applied to: eval_problems × n(128) × call_units(T=1, D=2, E=1 → 4 total) × avg_completion_tokens(438, real measured natural length, §9.2). eval_problems is not fixed in this plan (§12) — the figure below uses 25 (matches this project's own headroom-check precedent, `scripts/run_headroom_check_on_modal.py`), not a locked decision:
+Real measured rollout throughput (864.8 tok/s aggregate, §9.2) applied to: eval_problems × n(128) × call_units(T=1, D=2, E=1 → 4 total) × avg_completion_tokens(438, real measured natural length, §9.2).
 
-| Model | Estimated time (25 eval problems, both checkpoints) | Estimated cost |
+**eval_problems = 50, locked** (2026-08-12) — a deliberate, budget-driven compromise: real precedent (Yue et al. 2504.13837's own eval sets — 821 in-domain, 460 MathVista, 114 MathVision, the latter two being real visual/image-math benchmarks directly relevant to our D/E conditions) all run considerably larger and would cost proportionally more (114 alone ≈ $59 eval / ~$100 total, 460/821 far beyond scope); 50 was chosen as the largest count the available compute budget supports, trading away some of that statistical power (bootstrap CI on Δ_text/Δ_pixel will be wider, resampling from fewer problems) for affordability. Documented as a named scope limitation, same treatment as the single-seed decision (§3 Phase 1 item 4) — not presented as a "sufficient" sample size, just the budget-feasible one.
+
+| Model | Estimated time (50 eval problems, both checkpoints) | Estimated cost |
 |---|---|---|
-| 3B (Qwen2.5-VL-3B) | ~3.6 hr | ~$13 |
+| 3B (Qwen2.5-VL-3B) | ~7.2 hr | ~$26 |
 
 2B/7B rows removed for the same reason as §9.2.
 
 ### 9.4 Recommended sequencing
 
 1. Phase 0 (3B smoke test): trivial cost, <1 hour of actual compute.
-2. Phase 1 (3B, 1 seed, 300–400 steps, 1200-token cap): **~10.3–21.4 hr total, ~$38–$80** (real-throughput-based, §9.2+§9.3) — the core, load-bearing result.
+2. Phase 1 (3B, 1 seed, 500 steps, S=128, 50 eval problems, 1200-token cap): **~18.3 hr total, ~$67** (real-throughput-based, §9.2+§9.3) — the core, load-bearing result.
 3. Phase 2A (7B, if budget allows): run on **A100 40GB, not L4** (confirmed real instability risk on 24GB-class GPUs at this model size). Re-profile throughput at the 1200-token cap before committing compute — do not reuse the old 500-token-cap estimate.
 4. Phase 2B (2B, if budget allows): run the mandatory headroom pre-check first (near-zero cost), then proceed only if it passes. Re-profile throughput at the 1200-token cap before committing compute.
 
@@ -331,7 +333,8 @@ Real measured rollout throughput (864.8 tok/s aggregate, §9.2) applied to: eval
 
 - Final LoRA hyperparameters (rank, target modules, learning rate) and Dr. GRPO settings (KL coefficient) — decide before Phase 0. (Group size is now locked at 8 — see §3 Phase 1 item 5.)
 - ~~Prompts-per-training-step~~ — **locked**: 16 (group size 8, S=128 sequences/step, 500-step target — §3 Phase 1 items 5-6, real precedent and rationale there).
-- eval-problem-count and ppo_epochs — still not fixed; §9.3's compute estimate uses 25 as a placeholder (not a locked decision) — real precedent (Yue et al. 2504.13837's own eval sets: 821 in-domain, 460 MathVista, 114 MathVision) suggests this is likely too small for comparable statistical rigor; revisit before Phase 1 eval.
+- ~~eval-problem-count~~ — **locked**: 50, a deliberate budget-driven compromise below real precedent (§9.3 for full rationale and cost table) — expect a wider bootstrap CI on Δ_text/Δ_pixel than the paper's own 821/460/114 would give.
+- ppo_epochs — still not fixed (real Dr. GRPO precedent: 1, already set explicitly in `src/training/phase1_config.py`; revisit only if there's a specific reason to deviate).
 - Workshop target and deadline — determines how much of §10's checklist is feasible in the available time (priority order if constrained: manipulation check → perception-conditional/D-condition → confidence intervals → paraphrase OOD control → spurious-correctness spot check).
 - Whether to pursue Phase 2A (7B), Phase 2B (2B), both, or neither — decide **after** Phase 1 results are in, not before.
 - Re-run the novelty check (§8) close to submission.
