@@ -1,0 +1,52 @@
+# Real veRL environment for GCP, translated 1:1 from configs/modal_app_verl.py's
+# already-validated image build (`modal.Image.from_registry(...).run_commands(...)`)
+# so the GCP path reuses the exact same debugging work instead of re-deriving it.
+# Every step here matches a real bug found and fixed on live Modal infrastructure
+# (2026-08-10) - see configs/modal_app_verl.py's module docstring for the full
+# story of each one. Docker images are portable, so the base image and fixes
+# transfer directly; only the orchestration (Modal SDK -> plain docker) changes.
+#
+# Build once, reuse for both the calibration/dry-run test and the real Phase 1
+# run (PLAN.md's "environment reuse" optimization) - this is the one-time setup
+# cost, not something to redo per run.
+#
+# Usage: docker build -t vlm-pass-k-verl:latest -f configs/gcp/Dockerfile.verl .
+
+FROM verlai/verl:vllm024.dev2
+
+# First real bug (2026-08-10): this image ships a baked-in ENTRYPOINT that
+# auto-launches vLLM's OpenAI-compatible API server, hijacking any command
+# passed to `docker run`. Clearing it restores normal container behavior.
+ENTRYPOINT []
+
+# Second real bug (2026-08-10): despite the name, this image provides the
+# DEPENDENCY STACK (torch, vLLM, CUDA, flash-attn) but does NOT include verl
+# itself - confirmed via veRL's own install docs, which document exactly this
+# two-step process (pull the dependency image, then clone + editable-install).
+RUN git clone https://github.com/volcengine/verl /opt/verl && \
+    cd /opt/verl && pip3 install --no-deps -e .
+
+# Sixth real bug (2026-08-10), found by reading veRL's actual source
+# (verl/models/transformers/qwen2_vl.py, _get_input_embeds): for text-only
+# training (no image - this project's entire training design), veRL runs a
+# dummy all-zero image through the real vision encoder to keep FSDP happy
+# about every parameter being "used" each forward pass, then multiplies by
+# exactly 0.0 (changes nothing numerically, just touches the parameters for
+# gradient sync). That line assumed model.visual(...) returns a raw tensor;
+# the installed transformers version wraps it in BaseModelOutputWithPooling
+# instead. Patched to unwrap .last_hidden_state if present, else use as-is.
+RUN sed -i 's/0\.0 \* image_embeds\.mean()/0.0 * (image_embeds.last_hidden_state if hasattr(image_embeds, "last_hidden_state") else image_embeds).mean()/' \
+    /opt/verl/verl/models/transformers/qwen2_vl.py
+
+# Seventh real bug (2026-08-10): one line earlier than the fix above,
+# `model.visual(...)` itself raised "no attribute 'visual'" - direct
+# introspection of the real loaded model confirmed the vision tower lives at
+# model.model.visual in the installed transformers version, not model.visual
+# (a real HF class-hierarchy refactor, same class of drift as the fix above).
+RUN sed -i 's/image_embeds = model\.visual(pixel_values, grid_thw=image_grid_thw)/image_embeds = (model.visual if hasattr(model, "visual") else model.model.visual)(pixel_values, grid_thw=image_grid_thw)/' \
+    /opt/verl/verl/models/transformers/qwen2_vl.py
+
+# Repo code (src/, configs/, scripts/) is bind-mounted at container run time
+# (see scripts/gcp/run_training.sh), not baked into the image - keeps the
+# image stable while the code can still be updated with a `git pull` on the
+# host, no rebuild needed for ordinary code changes.

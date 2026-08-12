@@ -90,9 +90,25 @@ def build_args(
     rollout_gpu_mem_util: float = 0.6,
     total_training_steps: int = 500,
     checkpoint_every: int = 100,
+    seed: int = 0,
 ) -> list[str]:
     """
     Returns the full Hydra CLI arg list for `python3 -m verl.trainer.main_ppo`.
+
+    seed=0 (PLAN.md's "1 seed, seed 0" decision - §3 Phase 1 item 4) is
+    wired through data.seed, the one seed-related key confirmed in veRL's
+    real docs (verl.readthedocs.io/en/latest/examples/config.html) that's
+    directly relevant here - it pins GSM8K's shuffling order, which was
+    previously left at its default (null/unseeded), meaning two runs of
+    this same function would have silently produced different data orders.
+    Honest scope limit: this does NOT claim full bit-for-bit
+    reproducibility of the whole run - LoRA weight init and vLLM rollout
+    sampling have their own randomness sources, and no single documented
+    "seed everything" veRL key was found covering those too. "1 seed" in
+    this project's design was always about study scope (not characterizing
+    seed-to-seed variance across multiple runs), not a stronger
+    bit-reproducibility promise - this just makes the one real, confirmed
+    lever actually pinned instead of silently left unset.
 
     S (sequences/rollout) = prompts_per_step * group_size = 16 * 8 = 128,
     matching PLAN.md Section 9.2's S=128 row (11.1 hr / ~$41 at 500 steps,
@@ -112,6 +128,7 @@ def build_args(
         f"data.max_response_length={max_response_length}",
         "data.filter_overlong_prompts=True",
         "data.truncation=error",
+        f"data.seed={seed}",  # pins data-shuffling order - see module docstring on what this does/doesn't cover
         # ---- model / LoRA / vision exclusion ----
         f"actor_rollout_ref.model.path={model_path}",
         "actor_rollout_ref.model.use_remove_padding=True",
