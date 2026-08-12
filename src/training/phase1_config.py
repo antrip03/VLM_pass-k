@@ -28,6 +28,31 @@ ppo_epochs=1 set explicitly (not left to an unverified default) -
 matches real Dr. GRPO precedent (sail-sg/understand-r1-zero's
 train_zero_math.py: --num_ppo_epochs 1).
 
+lr=1e-6, use_kl_loss=False, lora_rank=32/lora_alpha=32 locked 2026-08-12
+(PLAN.md Section 12): lr/KL switched from veRL's generic LoRA+vision
+example defaults (3e-6, kl_loss_coef=0.01) to Dr. GRPO's own real recipe
+(train_zero_math.py: learning_rate=1e-6, beta/KL=0.0) - independently
+better-justified here too, not just "the paper's number": our single-GPU
+per-step batch (S=128) is a noisier gradient estimate than Dr. GRPO's real
+1024-sequence global batch (8 GPUs), arguing for the more conservative LR;
+and nonzero KL pulls the trained policy back toward the base model,
+directly damping Delta_text - the exact quantity this project measures -
+rather than guarding against a real evidenced risk (DeepSeek-R1-Zero's
+actual documented pure-RL issues were repetition/readability/language-
+mixing, not correctness or instruction-following collapse, with
+"little to no evidence of incoherence... on domains similar to math and
+coding" i.e. within-domain, which is exactly this project's GSM8K case).
+LoRA rank switched from 64 (also a veRL-example default, unverified for
+RLVR) to 32 per real RLVR+LoRA ablation evidence (arXiv 2512.23165: ranks
+16 and 32 land in the same 42-44% accuracy range - performance plateaus
+well before 32, r=1 clearly underperforms at 40.5% - and a separate
+finding that LoRA+RL accuracy stagnates or declines above the 32-64
+range, attributed to gradient entanglement from the low-rank bottleneck).
+alpha=32 kept equal to rank (1:1 scaling, the standard LoRA convention) -
+no RLVR-specific evidence found for a different ratio, so no reason to
+keep the previous 64/32=0.5 damped ratio that was itself just inherited,
+not chosen.
+
 Every FSDP/dtype/vision-exclusion bug fix from dry_run_config.py carries
 over unchanged - those are correctness fixes for this exact model on this
 exact veRL build, not dry-run-specific.
@@ -60,7 +85,7 @@ def build_args(
     max_prompt_length: int = 512,
     max_response_length: int = 1200,
     ppo_max_token_len_per_gpu: int = 8192,
-    lora_rank: int = 64,
+    lora_rank: int = 32,
     lora_alpha: int = 32,
     rollout_gpu_mem_util: float = 0.6,
     total_training_steps: int = 500,
@@ -97,14 +122,31 @@ def build_args(
         "actor_rollout_ref.model.exclude_modules=.*visual.*",
         "actor_rollout_ref.model.use_fused_kernels=True",
         # ---- actor / Dr. GRPO fixes ----
-        "actor_rollout_ref.actor.optim.lr=3e-6",
+        # lr=1e-6 and use_kl_loss=False (2026-08-12): switched from veRL's
+        # generic LoRA+vision example defaults (3e-6, kl_loss_coef=0.01) to
+        # match Dr. GRPO's own real, evidence-backed recipe (train_zero_math.py:
+        # learning_rate=1e-6, beta/KL=0.0) - not just "the paper's number" but
+        # independently better-justified for this project specifically: our
+        # single-GPU per-step batch (S=128) is a noisier gradient estimate than
+        # Dr. GRPO's real 1024-sequence global batch (8 GPUs), which argues for
+        # the more conservative LR, not the higher one; and a nonzero KL pulls
+        # the trained policy back toward the base model, directly damping
+        # Delta_text - the exact quantity this project measures - rather than
+        # protecting against a real, evidenced risk (DeepSeek-R1-Zero's actual
+        # documented pure-RL issues were repetition/readability/language-mixing,
+        # not correctness or instruction-following collapse, and specifically
+        # showed "little to no evidence of incoherence... on domains similar to
+        # math and coding" - i.e. within-domain, which is exactly our GSM8K
+        # case). Residual RLVR risk this does NOT address (right-answer/
+        # spurious-reasoning shortcuts) is a separate, already-covered item -
+        # PLAN.md Section 10's spurious-correctness spot check, not a KL
+        # question.
+        "actor_rollout_ref.actor.optim.lr=1e-6",
         f"actor_rollout_ref.actor.ppo_mini_batch_size={ppo_mini_batch_size}",
         "actor_rollout_ref.actor.ppo_epochs=1",  # explicit, matches real Dr. GRPO precedent - not left to an unverified default
         "actor_rollout_ref.actor.use_dynamic_bsz=True",
         f"actor_rollout_ref.actor.ppo_max_token_len_per_gpu={ppo_max_token_len_per_gpu}",
-        "actor_rollout_ref.actor.use_kl_loss=True",
-        "actor_rollout_ref.actor.kl_loss_coef=0.01",
-        "actor_rollout_ref.actor.kl_loss_type=low_var_kl",
+        "actor_rollout_ref.actor.use_kl_loss=False",
         "actor_rollout_ref.actor.entropy_coeff=0",
         "actor_rollout_ref.actor.entropy_from_logits_with_chunking=True",
         "actor_rollout_ref.actor.fsdp_config.param_offload=True",
