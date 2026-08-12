@@ -73,15 +73,37 @@ This installs Docker + `nvidia-container-toolkit` (explicitly, not assumed prese
 
 ---
 
+## 2b. Weights & Biases login (do this on the VM, never anywhere else)
+
+Training logs to console + wandb (`trainer.logger=[console,wandb]`, real syntax confirmed against docs.wandb.ai). The key is read from this shell's environment at run time — it's never written into any file or committed:
+```bash
+export WANDB_API_KEY=your-key-here
+# or: wandb login
+```
+**Only ever paste a wandb key directly into a terminal on a machine you control** (like this VM) — never into a chat, ticket, or any other channel. If a key is ever pasted somewhere it shouldn't be, treat it as compromised and rotate it (wandb.ai → Settings → API keys) rather than trusting it's fine.
+
+Training still runs without this set — `run_training.sh` will just warn that wandb won't authenticate; console logging is unaffected.
+
+---
+
 ## 3. Calibrate before committing the full budget
 
-Real veRL throughput (with `use_fused_kernels` + vLLM rollout) has never been measured — our $67 estimate is still based on a raw-HF proxy. Run a short real pass at the **actual production batch shape** (S=128) first:
+Two things have never been tested for real, and both are cheap to check before the full 500-step run:
 
+**a) Real throughput/VRAM at production batch shape.** Our $67 estimate is still based on a raw-HF proxy, not real veRL (with `use_fused_kernels` + vLLM rollout):
 ```bash
 TOTAL_STEPS=5 bash scripts/gcp/run_training.sh
 ```
-
 Check the output for: no OOM, a sane per-step time (compare against the raw-HF-proxy-based 11.1hr/500-step estimate in PLAN.md §9.2 — if real veRL is meaningfully faster, that's good news worth knowing before the full run), and that the reward signal is moving (not stuck at exactly 0 or exactly 1 for every sample).
+
+**b) Resume-from-checkpoint actually works.** `trainer.resume_mode=auto` was just wired in (checkpoints were always being saved every 100 steps, but nothing was using them on a restart before now) — this needs a real kill-and-restart test, not just trust:
+```bash
+TOTAL_STEPS=10 bash scripts/gcp/run_training.sh &
+sleep 60   # let it get partway, past the first save if save_freq is low enough for this quick test
+kill %1
+TOTAL_STEPS=10 bash scripts/gcp/run_training.sh   # should resume, not restart from step 0 - check the log output confirms this
+```
+If it doesn't resume cleanly, that's important to know now, not 8 hours into the real run.
 
 ---
 
@@ -131,4 +153,5 @@ gcloud compute instances delete vlm-pass-k-phase1 --zone=$GCP_ZONE
 ## Known gaps / things not yet verified live
 - The exact Deep Learning VM image family name (verify per step 1 above — version-dated, changes over time).
 - Whether Docker ships pre-installed on this image family (not confirmed against official docs — `setup_env.sh` installs it explicitly regardless, so this doesn't matter in practice, just noting it wasn't assumed).
-- Real veRL throughput/VRAM ceiling at S=128 with `use_fused_kernels` (exactly what step 3's calibration run answers — do not skip it).
+- Real veRL throughput/VRAM ceiling at S=128 with `use_fused_kernels` (exactly what step 3a's calibration run answers — do not skip it).
+- `trainer.resume_mode=auto` (checkpoint resume) has never been tested with a real kill-and-restart (step 3b — do not skip it either; a crash 8 hours into the real run is the wrong time to discover this doesn't work).

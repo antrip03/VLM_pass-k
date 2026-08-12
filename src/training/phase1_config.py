@@ -64,10 +64,8 @@ src/inference/run_sampling.py, src/metrics/bootstrap_ci.py) is more
 capable (T/D/E conditions, pass@k, bootstrap CI) than veRL's built-in val
 loop, so checkpoints are evaluated offline with that harness instead,
 using trainer.save_freq to control how often a checkpoint exists to
-evaluate. wandb logging also intentionally left off here (trainer.logger
-stays console-only) - needs a real wandb secret wired into the Modal app
-before a real run, a user-account-level decision not made yet, not a
-plumbing gap.
+evaluate. wandb logging enabled 2026-08-12 (see the trainer.logger line
+below for the real mechanism and why no key ever appears in this file).
 """
 
 from __future__ import annotations
@@ -193,7 +191,15 @@ def build_args(
         "actor_rollout_ref.ref.fsdp_config.use_orig_params=True",
         # ---- trainer ----
         "trainer.balance_batch=True",
-        "trainer.logger=[console]",  # wandb intentionally not wired yet - needs a real secret, see module docstring
+        # wandb enabled 2026-08-12 (real syntax confirmed against
+        # docs.wandb.ai/weave/guides/integrations/verl): reads WANDB_API_KEY
+        # from the environment at runtime - the key itself is never passed
+        # as a CLI arg or written into any file, only exported in the VM's
+        # own shell / passed through by scripts/gcp/run_training.sh's
+        # `docker run -e WANDB_API_KEY`. If WANDB_API_KEY isn't set when
+        # this runs, veRL/wandb will error asking you to log in - that's
+        # expected until a real (rotated) key is exported on the VM.
+        "trainer.logger=[console,wandb]",
         "trainer.project_name=grpo-vlm-modality-shift",
         "trainer.experiment_name=qwen2_5_vl_3b_phase1",
         "trainer.n_gpus_per_node=1",
@@ -203,7 +209,17 @@ def build_args(
         "trainer.total_epochs=1",
         f"trainer.total_training_steps={total_training_steps}",
         f"trainer.default_local_dir={checkpoint_dir}",
-        "trainer.resume_mode=disable",
+        # resume_mode=auto (was disable) 2026-08-12: checkpoints were
+        # already being saved every checkpoint_every steps, but nothing
+        # was wired to actually USE them on a restart - a crash meant
+        # starting over from step 0, not resuming. auto makes veRL look
+        # for and resume from the latest checkpoint under
+        # trainer.default_local_dir automatically. NOT yet verified with a
+        # real kill-and-restart test - do that cheaply (a few steps, kill
+        # the process, restart, confirm it resumes from the right step)
+        # before trusting this for the real 500-step run, same standard
+        # applied to every other untested mechanism in this project.
+        "trainer.resume_mode=auto",
         "trainer.critic_warmup=0",
         # ---- custom reward ----
         f"custom_reward_function.path={reward_fn_path}",
