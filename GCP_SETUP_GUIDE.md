@@ -14,26 +14,23 @@ Scripts referenced here: `scripts/gcp/create_vm.sh`, `scripts/gcp/setup_env.sh`,
 
 ## 0. One-time GCP account setup (skip anything already done)
 
-1. **Create/select a project** and confirm billing is enabled:
-   ```
-   gcloud projects create YOUR_PROJECT_ID   # or use an existing one
-   gcloud config set project YOUR_PROJECT_ID
-   ```
-   Billing must be linked via the Console (Billing → Link a billing account) — not a gcloud-only step.
+**What a VM is, in one sentence**: a rented computer sitting in Google's data center that you control remotely (via SSH, a terminal connection) — unlike Modal, which spun a GPU up and down automatically per job, a raw GCP VM sits there and bills you for as long as it exists and is *running*, which is why "stop it when done" comes up repeatedly below.
 
-2. **Enable the Compute Engine API**:
-   ```
-   gcloud services enable compute.googleapis.com
-   ```
+All of this happens at **console.cloud.google.com** unless noted otherwise:
 
-3. **Check/request A100 GPU quota** — the single most common real blocker. Quota is *not* automatic even with billing enabled, and A100s aren't available in every region.
-   - Console path (most reliable for a first check): **IAM & Admin → Quotas**, filter for "NVIDIA A100 GPUs", check your target region (e.g. `us-central1`) shows a limit ≥ 1.
-   - If it shows 0, request an increase from the same page (usually approved within minutes to a day for a small request like 1 GPU).
+1. **Confirm your project and billing**. The project dropdown is at the top of the console page — select one, or create a new one ("New Project", any name). Then go to **Billing** (search bar at top) and confirm an active billing account (with your credits) is linked to *that* project — credits do nothing until attached to a project.
 
-4. **Install/authenticate the `gcloud` CLI** locally, or use **Cloud Shell** (console.cloud.google.com → Activate Cloud Shell) — has `gcloud` pre-installed, avoids a local install entirely. Either works for the commands below; Cloud Shell itself has no GPU, it's just used to create/manage the real GPU VM.
-   ```
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT_ID
+2. **Enable the Compute Engine API**: search "Compute Engine API" in the top search bar → open it → click **Enable**. A fresh project doesn't have this on by default; nothing below works without it.
+
+3. **Check/request A100 GPU quota** — the single most common real blocker, and *not* automatic even with billing enabled. Search "Quotas" → **IAM & Admin → Quotas** → filter for `NVIDIA A100` → check your target region (e.g. `us-central1`) shows a Limit ≥ 1.
+   - If it shows 0: select that row → **Edit Quotas** (top of page) → request 1 or 2 → submit. Can be near-instant or take up to a day — **do this first**, everything else is blocked on it.
+
+4. **Open Cloud Shell**: the terminal icon (`>_`) top-right of the console. This gives you a real browser terminal, already authenticated, with `gcloud` pre-installed — no local install needed. Everything below runs here (Cloud Shell itself has no GPU; it's only used to create/manage the real GPU VM).
+
+5. **Get the scripts**:
+   ```bash
+   git clone --branch Guneesh https://github.com/antrip03/VLM_pass-k.git
+   cd VLM_pass-k
    ```
 
 ---
@@ -53,6 +50,15 @@ This creates `vlm-pass-k-phase1` (`a2-highgpu-1g`, 300GB SSD boot disk, a Deep L
 gcloud compute images list --project deeplearning-platform-release --filter="family~pytorch" --format="value(family)" | sort -u
 ```
 Override via `export IMAGE_FAMILY=...` before running `create_vm.sh` if the current one differs from the script's default.
+
+**If A100 quota is denied** (real, hit 2026-08-12): use the L4 fallback instead — check `NVIDIA_L4_GPUS` quota specifically (separate limit from A100) on the same Quotas page, then:
+```bash
+MACHINE_TYPE=g2-standard-8 bash scripts/gcp/create_vm.sh    # 1x L4 - test this first
+MACHINE_TYPE=g2-standard-24 bash scripts/gcp/create_vm.sh   # 2x L4 - only if 1x L4 doesn't fit
+```
+We don't yet have real data on whether the 3B model fits in a single L4's 24GB — run the calibration test (step 3) before committing to either.
+
+**Spot pricing** (real savings, real preemption risk — GCP typically cuts 60-91% off on-demand, L4 spot is a better bet than A100 spot would've been since L4 is far less contested): add `SPOT=true`, e.g. `SPOT=true MACHINE_TYPE=g2-standard-8 bash scripts/gcp/create_vm.sh`. **Only use this after step 3b's real kill-and-restart resume test has actually been run and confirmed working** — `resume_mode=auto` is wired in, but untested until you've verified it live.
 
 ---
 
