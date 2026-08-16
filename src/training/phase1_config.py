@@ -182,6 +182,43 @@ def build_args(
         f"actor_rollout_ref.rollout.n={group_size}",
         "actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=True",
         f"actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu={ppo_max_token_len_per_gpu}",
+        # disable_cascade_attn=True (2026-08-14): real, evidenced fix for a
+        # documented vLLM training-inference mismatch. Cascade attention is
+        # vLLM's shared-prefix batch-decoding optimization - exactly our
+        # situation, since group_size=8 means every rollout batch has 8
+        # sequences sharing the same prompt. A real report (Qwen3-14B-Base,
+        # on-policy GRPO, A100s) found this specific vLLM kernel path
+        # produces log-probs that don't exactly match the training engine's
+        # for the same tokens, and that disabling it dropped their
+        # mismatch metric (vllm-kl) from the 5e-2 to 1e-1 range down to
+        # ~1e-3, with rewards also improving - not just numerically
+        # cleaner, a real training-quality effect. "+" prefix required
+        # (this key isn't in veRL's base config schema, confirmed via the
+        # real recommended fix: "+actor_rollout_ref.rollout.engine_kwargs.
+        # vllm.disable_cascade_attn=True" for exactly this symptom,
+        # rollout_probs_diff_mean being too high). Real cost: gives up a
+        # secondary vLLM decode optimization, so some rollout slowdown is
+        # plausible - no precise number found, but this targets a root
+        # cause found to meaningfully affect actual training quality, not
+        # just a cosmetic fix, so it's worth the unquantified cost.
+        "+actor_rollout_ref.rollout.engine_kwargs.vllm.disable_cascade_attn=True",
+        # calculate_log_probs=True (2026-08-14): required for veRL's own
+        # rollout_corr/* metrics (kl, k3_kl, chi2_token, chi2_seq,
+        # log_ppl_abs_diff, ppl_ratio) to be computed at all - confirmed
+        # via verl.readthedocs.io/en/latest/algo/rollout_corr.html. This
+        # gives real visibility into residual training-inference mismatch
+        # in wandb (trainer.logger already includes wandb) without any
+        # extra plumbing - real, documented cost is small (~1% memory,
+        # 1-3% compute). Deliberately NOT also turning on active
+        # importance-sampling correction (algorithm.rollout_correction.
+        # rollout_is) yet - that reweights the loss itself, a more
+        # consequential, unverified-for-this-project mechanism change:
+        # if disable_cascade_attn already gets the real mismatch down to
+        # the reference report's ~1e-3 level, active correction may not be
+        # needed at all. Watch rollout_corr/kl and rollout_corr/
+        # log_ppl_abs_diff during the calibration run and decide from real
+        # data, not preemptively.
+        "actor_rollout_ref.rollout.calculate_log_probs=True",
         # ---- reference policy ----
         "actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True",
         f"actor_rollout_ref.ref.log_prob_max_token_len_per_gpu={ppo_max_token_len_per_gpu}",
