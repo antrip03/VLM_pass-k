@@ -11,10 +11,24 @@ scripts/run_verl_dry_run_on_modal.py (prepare_data -> run_training,
 subprocess into verl.trainer.main_ppo) - just swapped from the tiny
 dry_run_config to the real phase1_config, with the FULL GSM8K train split
 (not a 50-example slice), a configurable total_training_steps (so this
-can be invoked repeatedly across a multi-person split run), wandb via a
-Modal Secret (never a hardcoded key - see HANDOFF.md for setup), and a
+can be invoked repeatedly across a multi-person split run), and a
 dedicated checkpoint Volume separate from the dry-run one so a real run's
 checkpoints never get mixed up with old plumbing-check artifacts.
+
+wandb (2026-08-15, fixed from an earlier, worse design): NOT a
+pre-created Modal Secret requirement anymore - that made wandb a hard
+block on running at all (the function would fail before training even
+started if a "wandb-secret" Modal Secret hadn't been created via the
+dashboard first). Now reads WANDB_API_KEY from whoever's *local* shell
+runs `modal run` and passes it through as a dynamically-constructed
+per-call secret (modal.Secret.from_dict, via Function.with_options -
+real, current Modal API, not guessed) if present. If WANDB_API_KEY isn't
+set locally, WANDB_MODE=disabled is passed instead - verified this
+actually matters: wandb does NOT gracefully no-op without a key in a
+non-interactive environment, it either errors ("API key not configured")
+or hangs on an interactive login prompt nothing can answer inside a
+container. WANDB_MODE=disabled is the real, correct way to make it skip
+cleanly, not just omitting the key and hoping.
 
 Checkpoint persistence: this Volume (grpo-vlm-phase1-checkpoints) is where
 trainer.resume_mode=auto looks for the latest checkpoint on every
@@ -78,14 +92,13 @@ def prepare_data() -> dict:
     gpu="A100-40GB",
     volumes={MODEL_CACHE_DIR: model_cache, DATA_DIR: data_volume, CHECKPOINT_DIR: checkpoint_volume},
     timeout=TRAINING_TIMEOUT_SECONDS,
-    secrets=[modal.Secret.from_name("wandb-secret")],
 )
-def run_training(total_training_steps: int) -> dict:
+def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
     """
-    secrets=[modal.Secret.from_name("wandb-secret")]: requires a Modal
-    Secret named "wandb-secret" containing WANDB_API_KEY, created via the
-    Modal dashboard (Secrets -> Create new secret) BEFORE running this -
-    never pass the key as a CLI arg or hardcode it here. See HANDOFF.md.
+    No secrets= here - wandb is attached dynamically per-call from main()
+    below via with_options(), not required at decoration time. See the
+    module docstring for why (a fixed Modal Secret made wandb a hard
+    block on running at all).
     """
     import os
     import subprocess
@@ -108,7 +121,15 @@ def run_training(total_training_steps: int) -> dict:
 
     env = os.environ.copy()
     env["HF_HOME"] = MODEL_CACHE_DIR
-    # WANDB_API_KEY already present in env via the Modal Secret above.
+    if wandb_mode_disabled:
+        # No WANDB_API_KEY was available locally when this was launched -
+        # verified this is necessary, not just harmless-to-omit: wandb
+        # does NOT gracefully skip without a key in a non-interactive
+        # environment, it errors or hangs on a login prompt nothing can
+        # answer. WANDB_MODE=disabled makes it genuinely no-op instead.
+        env["WANDB_MODE"] = "disabled"
+    # else: WANDB_API_KEY is already present in env via the dynamically
+    # attached per-call secret (see main() below).
 
     print(f"Launching training: total_training_steps={total_training_steps} "
           f"(resume_mode=auto - will pick up from the latest checkpoint in "
@@ -158,12 +179,23 @@ def run_training(total_training_steps: int) -> dict:
 
 @app.local_entrypoint()
 def main(total_training_steps: int = 500):
+    import os
+
     print("=== Step 1: prepare_data (idempotent) ===")
     data_result = prepare_data.remote()
     print(f"  {data_result}")
 
+    wandb_key = os.environ.get("WANDB_API_KEY")
+    if wandb_key:
+        print("WANDB_API_KEY found locally - attaching it to this run.")
+        training_fn = run_training.with_options(secrets=[modal.Secret.from_dict({"WANDB_API_KEY": wandb_key})])
+    else:
+        print("WANDB_API_KEY not set locally - training will run WITHOUT wandb logging (console only).")
+        print("export WANDB_API_KEY=your-key before running this if you want live curves.")
+        training_fn = run_training
+
     print(f"\n=== Step 2: run_training (total_training_steps={total_training_steps}) ===")
-    train_result = run_training.remote(total_training_steps)
+    train_result = training_fn.remote(total_training_steps, wandb_mode_disabled=not bool(wandb_key))
     print(f"  returncode: {train_result['returncode']}")
     print("  --- stdout tail ---")
     print(train_result["stdout_tail"])

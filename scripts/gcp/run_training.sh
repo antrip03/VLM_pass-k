@@ -23,15 +23,21 @@ AUTO_SHUTDOWN="${AUTO_SHUTDOWN:-false}"
 # WANDB_API_KEY is read from THIS shell's environment (export it, or run
 # `wandb login`, directly on this VM before calling this script) and passed
 # through to the container - never hardcoded here or anywhere in the repo.
-# Training still runs fine without it set; veRL/wandb will just error on
-# the wandb logger specifically if it's missing, console logging is
-# unaffected either way.
+#
+# WANDB_MODE=disabled when no key is set (2026-08-15, real fix - a
+# previous version of this comment claimed training "runs fine either
+# way" without verifying it): wandb does NOT gracefully skip when it has
+# no key in a non-interactive container - it either errors ("API key not
+# configured") or hangs on an interactive login prompt nothing can
+# answer. WANDB_MODE=disabled is the real, correct way to make it no-op
+# cleanly instead of risking the whole run failing/hanging on this alone.
 WANDB_ARGS=()
 if [ -n "${WANDB_API_KEY:-}" ]; then
   WANDB_ARGS=(-e "WANDB_API_KEY=${WANDB_API_KEY}")
 else
-  echo "WANDB_API_KEY not set in this shell - wandb logging will fail to authenticate."
+  echo "WANDB_API_KEY not set in this shell - training will run WITHOUT wandb logging (console only)."
   echo "Run 'export WANDB_API_KEY=...' or 'wandb login' on this VM first if you want it."
+  WANDB_ARGS=(-e "WANDB_MODE=disabled")
 fi
 
 echo "Launching training: $TOTAL_STEPS steps. Data/checkpoints: $DATA_DIR"
