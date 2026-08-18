@@ -37,7 +37,8 @@ tune, just run:
 
 1. **A Modal account** — [modal.com](https://modal.com), free to sign up.
 2. **A wandb account and API key** — [wandb.ai](https://wandb.ai) → Settings → API keys. **This project requires wandb logging to actually work — it is not optional.** The run script below will refuse to start training if a valid key isn't available, rather than silently running without logging.
-3. **Local tools**:
+3. **Optional: a HuggingFace account and write token** — only if you want checkpoints also backed up to a private HF repo (see "Optional: also back up checkpoints" below). Not required to run training.
+4. **Local tools**:
    ```bash
    pip install modal wandb
    modal setup
@@ -50,13 +51,26 @@ git clone --branch Guneesh https://github.com/antrip03/VLM_pass-k.git
 cd VLM_pass-k
 ```
 
-## Set your wandb key (once)
+## Set your wandb key (once, required)
 ```bash
 echo "WANDB_API_KEY=your-real-key-here" > .env
 ```
 `.env` is git-ignored — it never gets committed, never leaves your machine. The run script sources it automatically every time, so this is a one-time step, not something to repeat.
 
 **Never paste a real key into a chat, ticket, or anything that gets committed.** If a key is ever exposed somewhere it shouldn't be, treat it as compromised and generate a new one — that applies regardless of intent, since a leaked key gets abused by third parties, not just whoever exposed it.
+
+## Optional: also back up checkpoints to HuggingFace Hub
+By default checkpoints live on a private Modal Volume only. If you'd rather also have them pushed to a private HuggingFace repo as extra backup (in case something ever happens to the Modal Volume), add two more lines to the same `.env`:
+```bash
+echo "HF_TOKEN=your-huggingface-write-token" >> .env
+echo "HF_UPLOAD_REPO=your-username/vlm-pass-k-phase1-checkpoints" >> .env
+```
+- Get a **write-scoped** token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) → "New token" → role **Write**.
+- Create the target repo yourself first (any name you like) — it'll be pushed to as **private**, never public, and nothing else needs to exist there beforehand.
+- This is entirely optional — leave these two lines out and everything works exactly the same, just without the extra off-Modal copy.
+- Same rule as the wandb key: only ever paste the real token into your own `.env` file, never into a chat or anything committed.
+
+If both are set, `scripts/run_phase1_on_modal.py` merges and pushes each new checkpoint to that repo as it's saved (via veRL's own real `model_merger` tool), running alongside training rather than waiting until the end. **Honest caveat**: this is new code, not yet exercised by a real run — if the upload step ever fails, training itself is unaffected (the failure is logged, not fatal) since checkpoints already safely exist on the Modal Volume regardless.
 
 ---
 
@@ -90,6 +104,7 @@ TOTAL_STEPS=50 bash scripts/run_modal.sh
   TOTAL_STEPS=10 bash scripts/run_modal.sh
   ```
   The second run should be noticeably faster and should mention resuming from a saved checkpoint in its output, not silently redo all 10 steps.
+- If `HF_TOKEN`/`HF_UPLOAD_REPO` are set (see above), each checkpoint also gets pushed to a private HuggingFace repo as a second, independent copy — a real backup beyond the Modal Volume, not just a convenience.
 
 ---
 

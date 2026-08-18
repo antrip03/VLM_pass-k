@@ -39,6 +39,23 @@ the GCP path. To hand a checkpoint off to someone running on a DIFFERENT
 environment (e.g. GCP), see HANDOFF.md's export/transfer steps - this
 script alone does not move checkpoints off Modal.
 
+HuggingFace Hub backup (2026-08-18, added on request - extra durability
+beyond the Modal Volume alone): if HF_TOKEN and HF_UPLOAD_REPO are set
+locally, a SEPARATE function (sync_checkpoints_to_hf) runs concurrently
+with training (Modal's Function.spawn(), not .remote() - fire-and-forget,
+runs alongside training rather than blocking on it) and polls the shared
+checkpoint Volume every few minutes. Each newly-appeared global_step_N/
+checkpoint gets merged into real HuggingFace format and pushed via veRL's
+own real, existing tool (python -m verl.model_merger merge --hf_upload_path
+- confirmed via verl.readthedocs.io/en/latest/advance/checkpoint.html,
+not invented), then marked with a local .uploaded_to_hf sentinel file so
+it's never re-uploaded. This is genuinely NEW, unverified-by-a-real-run
+code - the merge tool's exact behavior on our specific LoRA checkpoint
+layout has not been tested live. Both HF_TOKEN and HF_UPLOAD_REPO are
+optional: if either is missing, this sync simply doesn't run and training
+proceeds exactly as before (Modal Volume only) - never a hard requirement
+the way wandb now is.
+
 Usage:
     modal run scripts/run_phase1_on_modal.py --total-training-steps 250
 """
@@ -85,6 +102,104 @@ def prepare_data() -> dict:
         result["val"] = "already present"
     data_volume.commit()
     return result
+
+
+CHECKPOINT_SYNC_TIMEOUT_SECONDS = TRAINING_TIMEOUT_SECONDS  # needs to outlive training to keep polling
+CHECKPOINT_SYNC_POLL_SECONDS = 5 * 60  # how often to check for a new checkpoint to upload
+
+
+@app.function(
+    image=image,
+    volumes={CHECKPOINT_DIR: checkpoint_volume},
+    timeout=CHECKPOINT_SYNC_TIMEOUT_SECONDS,
+)
+def sync_checkpoints_to_hf(hf_upload_repo: str, stop_after_catchup: bool = False) -> dict:
+    """
+    Two uses of the same function:
+    1. Launched via .spawn() in main() (fire-and-forget, runs CONCURRENTLY
+       with training) with stop_after_catchup=False - polls indefinitely,
+       uploading each new global_step_N/ checkpoint to HuggingFace Hub via
+       veRL's own real model_merger tool as soon as it appears.
+    2. Called via .remote() (blocking) with stop_after_catchup=True AFTER
+       run_training returns - does exactly one poll-and-upload-everything-
+       pending pass, then exits immediately instead of continuing to sleep.
+       This exists because a spawned function isn't guaranteed to survive
+       past this ephemeral app's teardown once main() returns (confirmed
+       uncertain, not verified either way) - so the LAST checkpoint (the
+       one most likely to still be pending right when training finishes)
+       needs an explicit, synchronous, wait-for-it pass before the script
+       actually exits, not just trust from the background spawn alone.
+
+    checkpoint_volume.reload() each poll is required, not optional: Modal
+    Volumes don't auto-refresh a container's view of files written by a
+    DIFFERENT concurrently-running container (confirmed via
+    modal.com/docs/guide/volumes) - without this, this function would
+    only ever see whatever existed at the moment it started.
+
+    A .uploaded_to_hf sentinel file is written into each checkpoint folder
+    after a successful upload, so re-polling never re-uploads the same
+    step - and so this function can be safely re-run if it itself crashes
+    or times out, without redoing already-completed uploads.
+    """
+    import glob
+    import os
+    import subprocess
+    import time
+
+    print(f"Checkpoint->HF sync starting. Target repo: {hf_upload_repo}. "
+          f"stop_after_catchup={stop_after_catchup}.")
+
+    deadline = time.time() + CHECKPOINT_SYNC_TIMEOUT_SECONDS - 120
+    uploaded = []
+    failed = []
+
+    while time.time() < deadline:
+        checkpoint_volume.reload()
+        step_dirs = sorted(glob.glob(f"{CHECKPOINT_DIR}/global_step_*/actor"))
+        found_new = False
+        for actor_dir in step_dirs:
+            step_dir = os.path.dirname(actor_dir)
+            sentinel = os.path.join(step_dir, ".uploaded_to_hf")
+            if os.path.exists(sentinel):
+                continue
+            found_new = True
+            step_name = os.path.basename(step_dir)
+            target_dir = f"/tmp/hf_merge_{step_name}"
+            print(f"New checkpoint found: {step_name} - merging and uploading to {hf_upload_repo}...")
+            result = subprocess.run(
+                [
+                    "python3", "-m", "verl.model_merger", "merge",
+                    "--backend", "fsdp",
+                    "--local_dir", actor_dir,
+                    "--target_dir", target_dir,
+                    "--hf_upload_path", hf_upload_repo,
+                    "--private",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                with open(sentinel, "w") as f:
+                    f.write("uploaded")
+                checkpoint_volume.commit()
+                uploaded.append(step_name)
+                print(f"  {step_name}: uploaded OK.")
+            else:
+                failed.append(step_name)
+                print(f"  {step_name}: upload FAILED (exit {result.returncode})")
+                print(f"  stderr tail: {result.stderr[-2000:]}")
+
+        if stop_after_catchup and not found_new:
+            print("Catch-up pass complete, nothing pending - exiting.")
+            break
+        if stop_after_catchup:
+            # Found something this pass - do one more pass immediately in
+            # case a save was still mid-write, then check again before
+            # exiting, rather than sleeping the full poll interval.
+            continue
+        time.sleep(CHECKPOINT_SYNC_POLL_SECONDS)
+
+    return {"uploaded": uploaded, "failed": failed}
 
 
 @app.function(
@@ -194,6 +309,22 @@ def main(total_training_steps: int = 500):
         print("export WANDB_API_KEY=your-key before running this if you want live curves.")
         training_fn = run_training
 
+    # HuggingFace Hub backup: optional, both HF_TOKEN and HF_UPLOAD_REPO
+    # must be set locally for this to activate - if either is missing,
+    # training proceeds exactly as before (Modal Volume checkpoints only).
+    hf_token = os.environ.get("HF_TOKEN")
+    hf_upload_repo = os.environ.get("HF_UPLOAD_REPO")
+    hf_sync_active = bool(hf_token and hf_upload_repo)
+    if hf_sync_active:
+        print(f"HF_TOKEN and HF_UPLOAD_REPO found locally - checkpoints will also sync to "
+              f"huggingface.co/{hf_upload_repo} (private) as they're saved.")
+        sync_fn = sync_checkpoints_to_hf.with_options(secrets=[modal.Secret.from_dict({"HF_TOKEN": hf_token})])
+        print("Starting background checkpoint->HF sync (runs concurrently with training)...")
+        sync_fn.spawn(hf_upload_repo, stop_after_catchup=False)
+    else:
+        print("HF_TOKEN/HF_UPLOAD_REPO not set - checkpoints stay on the Modal Volume only "
+              "(this is fine, just no extra off-Modal backup).")
+
     print(f"\n=== Step 2: run_training (total_training_steps={total_training_steps}) ===")
     train_result = training_fn.remote(total_training_steps, wandb_mode_disabled=not bool(wandb_key))
     print(f"  returncode: {train_result['returncode']}")
@@ -201,6 +332,18 @@ def main(total_training_steps: int = 500):
     print(train_result["stdout_tail"])
     print("  --- stderr tail ---")
     print(train_result["stderr_tail"])
+
+    if hf_sync_active:
+        # Explicit, blocking catch-up pass for whatever checkpoint was
+        # saved right at the end - the background spawn above isn't
+        # guaranteed to survive this ephemeral app's teardown once main()
+        # returns, so this makes sure the LAST checkpoint doesn't get
+        # silently missed.
+        print("\n=== Final checkpoint->HF catch-up pass ===")
+        catchup_result = sync_fn.remote(hf_upload_repo, stop_after_catchup=True)
+        print(f"  uploaded this pass: {catchup_result['uploaded']}")
+        if catchup_result["failed"]:
+            print(f"  FAILED to upload: {catchup_result['failed']} - check the printed errors above.")
 
     if train_result["returncode"] == 0:
         print("\nTraining run exited cleanly (exit 0).")

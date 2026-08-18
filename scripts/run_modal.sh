@@ -49,6 +49,12 @@ if ! wandb login "$WANDB_API_KEY" --verify; then
 fi
 echo "wandb key verified OK - live training curves will work."
 
+if [ -n "${HF_TOKEN:-}" ] && [ -n "${HF_UPLOAD_REPO:-}" ]; then
+  echo "HF_TOKEN + HF_UPLOAD_REPO set - checkpoints will also back up to huggingface.co/$HF_UPLOAD_REPO (private)."
+else
+  echo "HF_TOKEN/HF_UPLOAD_REPO not set - checkpoints stay on the Modal Volume only (optional extra backup, not required)."
+fi
+
 if ! command -v modal &>/dev/null; then
   echo "ERROR: modal CLI not found. Run: pip install modal && modal setup"
   exit 1
