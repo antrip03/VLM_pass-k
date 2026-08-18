@@ -85,7 +85,7 @@ def build_args(
     ppo_max_token_len_per_gpu: int = 8192,
     lora_rank: int = 32,
     lora_alpha: int = 32,
-    rollout_gpu_mem_util: float = 0.6,
+    rollout_gpu_mem_util: float = 0.45,
     total_training_steps: int = 500,
     checkpoint_every: int = 100,
     seed: int = 0,
@@ -164,7 +164,38 @@ def build_args(
         "actor_rollout_ref.actor.use_kl_loss=False",
         "actor_rollout_ref.actor.entropy_coeff=0",
         "actor_rollout_ref.actor.entropy_from_logits_with_chunking=True",
-        "actor_rollout_ref.actor.fsdp_config.param_offload=True",
+        # param_offload=False (was True) - real crash found on a live Modal
+        # run 2026-08-19: "AssertionError: as_params=True
+        # type(prim_param)=<class 'torch.Tensor'>" in PyTorch FSDP internals
+        # (_flat_param.py, _use_unsharded_views), reached via
+        # offload_fsdp_model_to_cpu, i.e. exactly this offload path -
+        # crashed on the very first actor update step (before step 25,
+        # before any checkpoint - initial validation had already passed
+        # cleanly at 63.7% GSM8K, confirming the data/reward pipeline
+        # itself was fine). Root cause, confirmed via direct inspection of
+        # the actual PyTorch source (not the two GitHub issues first cited
+        # for this, which turned out NOT to actually support the claim on
+        # direct check - #4418 is an unrelated vLLM LoRA rollout assertion,
+        # #2655 is an unrelated missing-offload-for-ref-policy feature
+        # request): this assertion is specifically about SHARED/TIED
+        # parameters (_shared_param_infos, "primary owner" tracking).
+        # Qwen2.5-VL-3B-Instruct ties its word embeddings (confirmed via
+        # its real config.json: tie_word_embeddings=true) - since
+        # target_modules=all-linear wraps the LM head in a LoRA adapter,
+        # the tied embedding/LM-head pair very likely ends up with
+        # inconsistent nn.Parameter/Tensor typing specifically when
+        # param_offload's post-step reconstruction tries to rebuild that
+        # shared parameter's "primary owner". Disabling this offload
+        # avoids the code path entirely regardless of the exact mechanism.
+        # Real, adjacent corroborating evidence found independently:
+        # pytorch/pytorch#91165 (open, high-priority) documents FSDP +
+        # CPU offload + frozen-parameter models as a genuinely fragile,
+        # actively broken combination generally, consistent with this.
+        # rollout_gpu_mem_util lowered 0.6->0.45 (default above) to free
+        # VRAM headroom to compensate for the actor's params no longer
+        # being offloaded - untested at the time of this fix, verify with
+        # a cheap short run before trusting a long one.
+        "actor_rollout_ref.actor.fsdp_config.param_offload=False",
         "actor_rollout_ref.actor.fsdp_config.optimizer_offload=True",
         "actor_rollout_ref.actor.fsdp_config.model_dtype=bf16",
         "actor_rollout_ref.actor.fsdp_config.use_orig_params=True",
