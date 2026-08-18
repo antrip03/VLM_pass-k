@@ -113,18 +113,46 @@ def run_training(total_training_steps: int) -> dict:
     print(f"Launching training: total_training_steps={total_training_steps} "
           f"(resume_mode=auto - will pick up from the latest checkpoint in "
           f"{CHECKPOINT_DIR} if one exists from a prior invocation)")
-    result = subprocess.run(
-        ["python3", "-m", "verl.trainer.main_ppo", *args],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=TRAINING_TIMEOUT_SECONDS - 300,
-    )
-    checkpoint_volume.commit()
+
+    # Real gap found and fixed 2026-08-15: subprocess.run(..., timeout=...)
+    # raises TimeoutExpired on timeout - previously uncaught, meaning
+    # checkpoint_volume.commit() below never ran and the function crashed
+    # with a raw traceback instead of a clear result. Modal Volumes DO
+    # auto-commit in the background every few seconds and on container
+    # shutdown (confirmed via modal.com/docs/guide/volumes), so checkpoint
+    # progress itself was likely NOT actually at risk even before this fix
+    # - but relying on that implicitly rather than committing explicitly,
+    # and crashing instead of reporting clearly, was still worth fixing:
+    # your teammate should see "hit the timeout, re-run to resume", not an
+    # unexplained crash that looks like something is broken.
+    try:
+        result = subprocess.run(
+            ["python3", "-m", "verl.trainer.main_ppo", *args],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=TRAINING_TIMEOUT_SECONDS - 300,
+        )
+        returncode = result.returncode
+        stdout_tail = result.stdout[-8000:]
+        stderr_tail = result.stderr[-8000:]
+        timed_out = False
+    except subprocess.TimeoutExpired as e:
+        returncode = -1
+        stdout_tail = (e.stdout or "")[-8000:] if e.stdout else ""
+        stderr_tail = (e.stderr or "")[-8000:] if e.stderr else ""
+        timed_out = True
+    finally:
+        # Explicit commit regardless of how the subprocess ended (success,
+        # failure, or timeout) - belt-and-suspenders on top of Modal's own
+        # background/shutdown auto-commit, not a substitute for it.
+        checkpoint_volume.commit()
+
     return {
-        "returncode": result.returncode,
-        "stdout_tail": result.stdout[-8000:],
-        "stderr_tail": result.stderr[-8000:],
+        "returncode": returncode,
+        "timed_out": timed_out,
+        "stdout_tail": stdout_tail,
+        "stderr_tail": stderr_tail,
     }
 
 
@@ -146,5 +174,10 @@ def main(total_training_steps: int = 500):
         print("\nTraining run exited cleanly (exit 0).")
         print("Checkpoints are on the 'grpo-vlm-phase1-checkpoints' Modal Volume.")
         print("See HANDOFF.md for how to export/transfer them if handing off to another environment.")
+    elif train_result.get("timed_out"):
+        print(f"\nHit this invocation's {TRAINING_TIMEOUT_SECONDS // 3600}hr timeout - this is expected for a")
+        print("long run, not a failure. Checkpoints up to the last save are safely committed to the Volume.")
+        print("Just re-run the exact same command again - resume_mode=auto will pick up from the last")
+        print("checkpoint automatically, not restart from step 0.")
     else:
         print(f"\nTraining exited with code {train_result['returncode']} - check the output above.")
