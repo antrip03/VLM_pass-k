@@ -46,10 +46,20 @@ tune, just run:
    `modal setup` opens a browser to link the CLI to your Modal account.
 
 ## Get the code
+
+> **⚠️ The `--branch Guneesh` part is not optional.** This repo's *default* branch (`main`) contains only an early scaffold commit — `src/training/` doesn't exist there at all. A plain `git clone` silently gets you the wrong branch. All of this project's real code lives on `Guneesh`.
+
 ```bash
 git clone --branch Guneesh https://github.com/antrip03/VLM_pass-k.git
 cd VLM_pass-k
 ```
+
+Already have a clone from earlier? Make sure it's actually current before running anything:
+```bash
+git checkout Guneesh && git pull origin Guneesh
+git log -1 --oneline    # confirm you see a recent commit, not an old one
+```
+`bash scripts/run_modal.sh` now prints the branch + commit it's about to run and hard-fails on known-broken settings, so you'll see immediately if you're on stale code rather than finding out 20 minutes into a paid run.
 
 ## Set your wandb key (once, required)
 ```bash
@@ -128,6 +138,8 @@ Modal's A100-40GB rate is roughly **~$2/hr** (verify against Modal's own current
 
 - **`bash scripts/run_modal.sh` says wandb verification failed**: your key is wrong, expired, or mistyped. Get a fresh one from wandb.ai and update `.env`.
 - **`modal run` fails with an auth error**: re-run `modal setup`.
+- **`AssertionError: as_params=True type(prim_param)=<class 'torch.Tensor'>`** (crashes on the first actor update step, after validation passes): this is a real PyTorch FSDP bug hit by the actor's CPU parameter offload — Qwen2.5-VL-3B ties its word embeddings, and FSDP1's shared-parameter handling breaks under `use_orig_params=True` when that offload runs. **It is already fixed** (`actor.fsdp_config.param_offload=False`). If you still see it, you are running code from before the fix — `bash scripts/run_modal.sh` will now catch this and refuse to start, telling you exactly what to do. Fix with `git checkout Guneesh && git pull origin Guneesh`.
+- **`ERROR: actor param_offload=True detected`**: the guard above doing its job. You're on stale code; pull the latest `Guneesh` and re-run.
 - **Training crashes (not the wandb check, not a timeout)**: this is the first real execution of this exact production config on Modal — a first-run issue wouldn't be surprising given how this project has gone on every new environment so far (11 real bugs found and fixed getting the GCP/Modal paths working in the first place). Capture the actual printed error and report it rather than guessing at a fix.
 - **Unsure if it's making real progress**: check wandb or the Modal dashboard's live logs — the console prints real per-step information throughout, not just silence until done.
 

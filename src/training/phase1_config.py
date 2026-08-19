@@ -253,7 +253,15 @@ def build_args(
         # ---- reference policy ----
         "actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True",
         f"actor_rollout_ref.ref.log_prob_max_token_len_per_gpu={ppo_max_token_len_per_gpu}",
-        "actor_rollout_ref.ref.fsdp_config.param_offload=True",
+        # Also False, same reason as the actor's above. Currently INERT -
+        # confirmed via veRL's own docs ("The reference model will be
+        # enabled when actor.use_kl_loss or/and algorithm.use_kl_in_reward
+        # is/are True"), and this project sets both to False, so no
+        # reference policy is created at all and this key is never read.
+        # Set anyway so that if KL is ever re-enabled, it doesn't silently
+        # reintroduce the exact crash just fixed on the actor side - the
+        # ref policy wraps the same tied-embedding model.
+        "actor_rollout_ref.ref.fsdp_config.param_offload=False",
         "actor_rollout_ref.ref.entropy_from_logits_with_chunking=True",
         "actor_rollout_ref.ref.fsdp_config.model_dtype=bf16",
         "actor_rollout_ref.ref.fsdp_config.use_orig_params=True",
