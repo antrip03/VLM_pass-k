@@ -15,6 +15,12 @@
 
 set -euo pipefail
 
+# Windows consoles default Python's stdout to a codepage (e.g. cp1252) that
+# can't encode the Unicode characters (checkmarks, etc.) Modal's CLI prints -
+# without this, `modal run` crashes on its own status output before it even
+# gets to dispatching a single function call. Harmless on Linux/macOS.
+export PYTHONUTF8=1
+
 if [ -f .env ]; then
   echo "Loading .env (local only, never committed - see .gitignore)"
   set -a
@@ -54,6 +60,22 @@ if ! command -v modal &>/dev/null; then
   exit 1
 fi
 
+if [ -z "${HF_TOKEN:-}" ]; then
+  echo ""
+  echo "WARNING: HF_TOKEN is not set - checkpoints will only live on this Modal account's"
+  echo "Volume. If you might switch Modal accounts/workspaces mid-run, that Volume will NOT"
+  echo "be reachable from the new account. Set HF_TOKEN (a write-scoped token from"
+  echo "https://huggingface.co/settings/tokens, e.g. in .env) to mirror checkpoints to a"
+  echo "private HF Hub repo as a cross-account backup. Continuing without it..."
+fi
+
 echo ""
-echo "Starting the real Phase 1 run on Modal (total_training_steps=$TOTAL_STEPS)..."
-modal run scripts/run_phase1_on_modal.py --total-training-steps "$TOTAL_STEPS"
+echo "Deploying the training app to Modal (persistent - not tied to this session, unlike"
+echo "a plain 'modal run', which was observed live to die on a local network drop even"
+echo "with --detach)..."
+modal deploy scripts/run_phase1_on_modal.py
+
+echo ""
+echo "Triggering the run via a single fire-and-forget call (total_training_steps=$TOTAL_STEPS)."
+echo "Safe to close this terminal/laptop as soon as this returns..."
+TOTAL_STEPS="$TOTAL_STEPS" python3 scripts/trigger_phase1_training.py

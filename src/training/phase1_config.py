@@ -85,10 +85,11 @@ def build_args(
     ppo_max_token_len_per_gpu: int = 8192,
     lora_rank: int = 32,
     lora_alpha: int = 32,
-    rollout_gpu_mem_util: float = 0.6,
+    rollout_gpu_mem_util: float = 0.45,
     total_training_steps: int = 500,
     checkpoint_every: int = 100,
     seed: int = 0,
+    val_before_train: bool = True,
 ) -> list[str]:
     """
     Returns the full Hydra CLI arg list for `python3 -m verl.trainer.main_ppo`.
@@ -134,6 +135,15 @@ def build_args(
         f"actor_rollout_ref.model.lora_rank={lora_rank}",
         f"actor_rollout_ref.model.lora_alpha={lora_alpha}",
         "actor_rollout_ref.model.target_modules=all-linear",
+        # lm_head exclusion TRIED AND DISPROVEN 2026-08-19: excluding the
+        # LM head from LoRA did NOT stop the FSDP tied-parameter assertion
+        # (same error, same post-forward reshard site). The tie is a
+        # property of the BASE model (tie_word_embeddings=true), not of
+        # LoRA wrapping - so excluding lm_head from the adapter was never
+        # going to change FSDP's shared-parameter bookkeeping. Reverted to
+        # the original visual-only exclusion; the real fix is strategy=fsdp2
+        # below. Kept quoted-regex-free (no parens/pipes) since Hydra's
+        # override grammar rejects bare parentheses.
         "actor_rollout_ref.model.exclude_modules=.*visual.*",
         "actor_rollout_ref.model.use_fused_kernels=True",
         # ---- actor / Dr. GRPO fixes ----
@@ -156,6 +166,26 @@ def build_args(
         # spurious-reasoning shortcuts) is a separate, already-covered item -
         # PLAN.md Section 10's spurious-correctness spot check, not a KL
         # question.
+        # strategy=fsdp2 (2026-08-19) - the REAL fix for the tied-parameter
+        # crash that neither param_offload=False nor excluding lm_head from
+        # LoRA resolved. Read from PyTorch's own source: the assertion lives
+        # in FSDP1's _flat_param.py, in the loop over _shared_param_infos,
+        # and requires the PRIMARY of a tied pair to still be an nn.Parameter
+        # when this handle reshards with as_params=True. During
+        # forward/backward FSDP1 registers params as bare Tensors
+        # (as_params=False -> _setattr_tensor, "hide originals from
+        # named_parameters()"), so when the tied pair
+        # (embed_tokens.weight <-> lm_head.weight, tie_word_embeddings=true
+        # on Qwen2.5-VL) is split across two different FSDP units, one unit
+        # reshards while the other still holds a plain Tensor -> assertion.
+        # That is a property of the base model's weight tying and FSDP1's
+        # flat-parameter bookkeeping, which is why neither earlier fix
+        # touched it. FSDP2 shards per-parameter via DTensor and has no
+        # flat_param/_shared_param_infos machinery at all, so this code path
+        # does not exist there. LoRA + vLLM rollout is documented as
+        # supported under strategy=fsdp2 (verl.readthedocs.io ppo_lora).
+        "actor_rollout_ref.actor.strategy=fsdp2",
+        "actor_rollout_ref.ref.strategy=fsdp2",
         "actor_rollout_ref.actor.optim.lr=1e-6",
         f"actor_rollout_ref.actor.ppo_mini_batch_size={ppo_mini_batch_size}",
         "actor_rollout_ref.actor.ppo_epochs=1",  # explicit, matches real Dr. GRPO precedent - not left to an unverified default
@@ -164,7 +194,38 @@ def build_args(
         "actor_rollout_ref.actor.use_kl_loss=False",
         "actor_rollout_ref.actor.entropy_coeff=0",
         "actor_rollout_ref.actor.entropy_from_logits_with_chunking=True",
-        "actor_rollout_ref.actor.fsdp_config.param_offload=True",
+        # param_offload=False (was True) - real crash found on a live Modal
+        # run 2026-08-19: "AssertionError: as_params=True
+        # type(prim_param)=<class 'torch.Tensor'>" in PyTorch FSDP internals
+        # (_flat_param.py, _use_unsharded_views), reached via
+        # offload_fsdp_model_to_cpu, i.e. exactly this offload path -
+        # crashed on the very first actor update step (before step 25,
+        # before any checkpoint - initial validation had already passed
+        # cleanly at 63.7% GSM8K, confirming the data/reward pipeline
+        # itself was fine). Root cause, confirmed via direct inspection of
+        # the actual PyTorch source (not the two GitHub issues first cited
+        # for this, which turned out NOT to actually support the claim on
+        # direct check - #4418 is an unrelated vLLM LoRA rollout assertion,
+        # #2655 is an unrelated missing-offload-for-ref-policy feature
+        # request): this assertion is specifically about SHARED/TIED
+        # parameters (_shared_param_infos, "primary owner" tracking).
+        # Qwen2.5-VL-3B-Instruct ties its word embeddings (confirmed via
+        # its real config.json: tie_word_embeddings=true) - since
+        # target_modules=all-linear wraps the LM head in a LoRA adapter,
+        # the tied embedding/LM-head pair very likely ends up with
+        # inconsistent nn.Parameter/Tensor typing specifically when
+        # param_offload's post-step reconstruction tries to rebuild that
+        # shared parameter's "primary owner". Disabling this offload
+        # avoids the code path entirely regardless of the exact mechanism.
+        # Real, adjacent corroborating evidence found independently:
+        # pytorch/pytorch#91165 (open, high-priority) documents FSDP +
+        # CPU offload + frozen-parameter models as a genuinely fragile,
+        # actively broken combination generally, consistent with this.
+        # rollout_gpu_mem_util lowered 0.6->0.45 (default above) to free
+        # VRAM headroom to compensate for the actor's params no longer
+        # being offloaded - untested at the time of this fix, verify with
+        # a cheap short run before trusting a long one.
+        "actor_rollout_ref.actor.fsdp_config.param_offload=False",
         "actor_rollout_ref.actor.fsdp_config.optimizer_offload=True",
         "actor_rollout_ref.actor.fsdp_config.model_dtype=bf16",
         "actor_rollout_ref.actor.fsdp_config.use_orig_params=True",
@@ -243,6 +304,14 @@ def build_args(
         "trainer.nnodes=1",
         f"trainer.save_freq={checkpoint_every}",
         "trainer.test_freq=-1",  # our own T/D/E harness evaluates checkpoints offline instead - see module docstring
+        # val_before_train: veRL runs a full validation pass over all 1319
+        # GSM8K test examples BEFORE training step 1 (test_freq=-1 only
+        # disables the periodic in-loop validation, not this one). Measured
+        # at 7.4 min on a real run, and longer since gpu_memory_utilization
+        # dropped to 0.45. Genuinely useful as a baseline for the real run,
+        # pure dead time for a short smoke test whose only question is
+        # whether the first training step crashes - hence configurable.
+        f"trainer.val_before_train={val_before_train}",
         "trainer.total_epochs=1",
         f"trainer.total_training_steps={total_training_steps}",
         f"trainer.default_local_dir={checkpoint_dir}",

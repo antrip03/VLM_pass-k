@@ -102,6 +102,7 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
     """
     import os
     import subprocess
+    import threading
 
     import src as _src
 
@@ -117,6 +118,11 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
         reward_fn_path=str(reward_fn_path),
         checkpoint_dir=CHECKPOINT_DIR,
         total_training_steps=total_training_steps,
+        checkpoint_every=25,
+        # Short runs are smoke tests (does the first training step survive?)
+        # - skip veRL's ~8min full-test-set baseline validation for those,
+        # keep it for real runs where the baseline is actual data.
+        val_before_train=total_training_steps > 10,
     )
 
     env = os.environ.copy()
@@ -135,6 +141,32 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
           f"(resume_mode=auto - will pick up from the latest checkpoint in "
           f"{CHECKPOINT_DIR} if one exists from a prior invocation)")
 
+    # HF Hub checkpoint mirror: only active if HF_TOKEN was attached (see
+    # main() below). Covers the case a Modal Volume alone can't - resuming
+    # after switching to a DIFFERENT Modal account/workspace, since Volumes
+    # don't carry over between accounts. Pull-before/push-during, both
+    # best-effort (see src/training/hf_checkpoint_sync.py docstring).
+    hf_watch_stop = None
+    hf_watch_thread = None
+    if os.environ.get("HF_TOKEN"):
+        from src.training.hf_checkpoint_sync import ensure_repo, pull_latest_checkpoint, watch_and_push
+
+        try:
+            rid = ensure_repo()
+            print(f"[hf_checkpoint_sync] Mirroring checkpoints to Hub repo {rid}.")
+            pull_latest_checkpoint(CHECKPOINT_DIR)
+        except Exception as e:
+            print(f"[hf_checkpoint_sync] WARNING: setup failed, continuing without Hub mirror: {e}")
+        else:
+            hf_watch_stop = threading.Event()
+            hf_watch_thread = threading.Thread(
+                target=watch_and_push, args=(CHECKPOINT_DIR, hf_watch_stop), daemon=True
+            )
+            hf_watch_thread.start()
+    else:
+        print("[hf_checkpoint_sync] HF_TOKEN not set - checkpoints will NOT be mirrored off Modal; "
+              "a Modal account/workspace switch would lose them.")
+
     # Real gap found and fixed 2026-08-15: subprocess.run(..., timeout=...)
     # raises TimeoutExpired on timeout - previously uncaught, meaning
     # checkpoint_volume.commit() below never ran and the function crashed
@@ -146,28 +178,87 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
     # and crashing instead of reporting clearly, was still worth fixing:
     # your teammate should see "hit the timeout, re-run to resume", not an
     # unexplained crash that looks like something is broken.
+    # Streamed line-by-line (2026-08-19, replacing subprocess.run with
+    # capture_output=True): the old version buffered ALL of veRL's output
+    # until the process exited, so a multi-hour run showed literally
+    # nothing in `modal app logs` until it was over - no way to tell
+    # "loading the model" from "training step 300" from "hung". Popen with
+    # stderr merged into stdout lets every line reach Modal's logs live,
+    # while a bounded deque still keeps the tail for the return value
+    # (so nothing that used to be reported is lost).
+    import collections
+    import re
+    import time
+
+    deadline = time.time() + (TRAINING_TIMEOUT_SECONDS - 300)
+    tail = collections.deque(maxlen=500)
+    step_re = re.compile(r"training/global_step:(\d+)")
+    run_start = time.time()
+    prev_step, prev_step_time = 0, run_start
+    recent_step_secs: collections.deque = collections.deque(maxlen=20)
+    timed_out = False
+
+    def _hms(seconds: float) -> str:
+        seconds = int(max(seconds, 0))
+        return f"{seconds // 3600:d}h{(seconds % 3600) // 60:02d}m{seconds % 60:02d}s"
+
+    proc = subprocess.Popen(
+        ["python3", "-m", "verl.trainer.main_ppo", *args],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    print(f"[progress] training subprocess started (pid {proc.pid}). "
+          f"Target: {total_training_steps} steps, checkpoint every 25.", flush=True)
     try:
-        result = subprocess.run(
-            ["python3", "-m", "verl.trainer.main_ppo", *args],
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=TRAINING_TIMEOUT_SECONDS - 300,
-        )
-        returncode = result.returncode
-        stdout_tail = result.stdout[-8000:]
-        stderr_tail = result.stderr[-8000:]
-        timed_out = False
-    except subprocess.TimeoutExpired as e:
-        returncode = -1
-        stdout_tail = (e.stdout or "")[-8000:] if e.stdout else ""
-        stderr_tail = (e.stderr or "")[-8000:] if e.stderr else ""
-        timed_out = True
+        for line in proc.stdout:
+            line = line.rstrip()
+            tail.append(line)
+            print(line, flush=True)
+
+            match = step_re.search(line)
+            if match:
+                step = int(match.group(1))
+                if step > prev_step:
+                    now = time.time()
+                    recent_step_secs.append((now - prev_step_time) / (step - prev_step))
+                    avg = sum(recent_step_secs) / len(recent_step_secs)
+                    remaining = (total_training_steps - step) * avg
+                    print(
+                        f"[progress] step {step}/{total_training_steps}"
+                        f" | elapsed {_hms(now - run_start)}"
+                        f" | {avg:.1f}s/step (last {len(recent_step_secs)})"
+                        f" | ETA {_hms(remaining)}"
+                        f" | done ~{time.strftime('%H:%M UTC', time.gmtime(now + remaining))}",
+                        flush=True,
+                    )
+                    prev_step, prev_step_time = step, now
+
+            # Deadline is checked per line rather than by a hard timer:
+            # veRL is chatty enough that this fires promptly in practice,
+            # and Modal's own function timeout remains the hard backstop.
+            if time.time() > deadline:
+                print("[progress] per-invocation deadline reached - stopping so checkpoints "
+                      "commit cleanly. Re-run to resume from the last checkpoint.", flush=True)
+                proc.kill()
+                timed_out = True
+                break
+
+        proc.wait(timeout=120)
+        returncode =   -1 if timed_out else proc.returncode
+        text_tail = "\n".join(tail)
+        stdout_tail = text_tail[-8000:]
+        stderr_tail = text_tail[-3000:]  # stderr is merged into stdout now
     finally:
         # Explicit commit regardless of how the subprocess ended (success,
         # failure, or timeout) - belt-and-suspenders on top of Modal's own
         # background/shutdown auto-commit, not a substitute for it.
         checkpoint_volume.commit()
+        if hf_watch_stop is not None:
+            hf_watch_stop.set()
+            hf_watch_thread.join(timeout=600)
 
     return {
         "returncode": returncode,
@@ -186,13 +277,25 @@ def main(total_training_steps: int = 500):
     print(f"  {data_result}")
 
     wandb_key = os.environ.get("WANDB_API_KEY")
+    secrets = {}
     if wandb_key:
         print("WANDB_API_KEY found locally - attaching it to this run.")
-        training_fn = run_training.with_options(secrets=[modal.Secret.from_dict({"WANDB_API_KEY": wandb_key})])
+        secrets["WANDB_API_KEY"] = wandb_key
     else:
         print("WANDB_API_KEY not set locally - training will run WITHOUT wandb logging (console only).")
         print("export WANDB_API_KEY=your-key before running this if you want live curves.")
-        training_fn = run_training
+
+    hf_token = os.environ.get("HF_TOKEN")
+    if hf_token:
+        print("HF_TOKEN found locally - attaching it so checkpoints get mirrored to a private HF Hub repo "
+              "(survives a Modal account/workspace switch, which the Volume alone does not).")
+        secrets["HF_TOKEN"] = hf_token
+    else:
+        print("HF_TOKEN not set locally - checkpoints will only live on the Modal Volume. If you might switch "
+              "Modal accounts mid-run, export HF_TOKEN (a write-scoped token from huggingface.co/settings/tokens) "
+              "so checkpoints get mirrored to the Hub too.")
+
+    training_fn = run_training.with_options(secrets=[modal.Secret.from_dict(secrets)]) if secrets else run_training
 
     print(f"\n=== Step 2: run_training (total_training_steps={total_training_steps}) ===")
     train_result = training_fn.remote(total_training_steps, wandb_mode_disabled=not bool(wandb_key))
