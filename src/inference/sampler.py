@@ -54,34 +54,95 @@ class SampleResult:
 
 
 def _generate_text_batch(
-    model, processor, prompt_text: str, n: int, max_new_tokens: int, temperature: float
+    model,
+    processor,
+    prompt_text: str,
+    n: int,
+    max_new_tokens: int,
+    temperature: float,
+    text_chunk: int | None = None,
 ) -> list[str]:
     """
     Text-only generation, batched via num_return_sequences - validated
     safe at real concurrency (scripts/vram_smoke_test_2000cap.py: 64
     concurrent sequences, 10.98 GB peak on a 40GB A100, huge margin).
+
+    Chunked with OOM fallback (2026-08-20): that 40GB margin does NOT
+    carry to smaller cards. At the eval's real n=128, KV cache alone is
+    ~8.5GB on top of ~7.5GB of weights, which is comfortable on an A100
+    but close to the edge of a 24GB A10G. Rather than assume, generate in
+    chunks and halve on CUDA OOM, mirroring _generate_image_batch. Default
+    (None) keeps the original single-call behaviour so A100 runs are
+    unchanged.
     """
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt_text}]}]
     prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = processor(text=[prompt], return_tensors="pt").to(model.device)
     prompt_len = inputs["input_ids"].shape[1]
     pad_id = processor.tokenizer.pad_token_id
-    with torch.no_grad():
-        out = model.generate(
-            **inputs, max_new_tokens=max_new_tokens, do_sample=True, temperature=temperature, num_return_sequences=n
-        )
-    completions = []
-    for seq in out:
-        generated = seq[prompt_len:]
-        nonpad = generated[generated != pad_id]
-        completions.append(processor.tokenizer.decode(nonpad, skip_special_tokens=True))
+
+    completions: list[str] = []
+    remaining = n
+    chunk = n if text_chunk is None else max(1, min(text_chunk, n))
+    while remaining > 0:
+        this_chunk = min(chunk, remaining)
+        try:
+            with torch.no_grad():
+                out = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=True,
+                    temperature=temperature,
+                    num_return_sequences=this_chunk,
+                )
+        except torch.cuda.OutOfMemoryError:
+            if chunk == 1:
+                raise
+            chunk = max(1, chunk // 2)
+            torch.cuda.empty_cache()
+            print(f"[sampler] text generation OOM - halving chunk to {chunk} and retrying")
+            continue
+        for seq in out:
+            generated = seq[prompt_len:]
+            nonpad = generated[generated != pad_id]
+            completions.append(processor.tokenizer.decode(nonpad, skip_special_tokens=True))
+        remaining -= this_chunk
     return completions
 
 
-def _generate_image_batch(model, processor, image, instruction: str, n: int, max_new_tokens: int, temperature: float) -> list[str]:
+DEFAULT_IMAGE_CHUNK = 16
+
+
+def _generate_image_batch(
+    model,
+    processor,
+    image,
+    instruction: str,
+    n: int,
+    max_new_tokens: int,
+    temperature: float,
+    image_chunk: int = DEFAULT_IMAGE_CHUNK,
+) -> list[str]:
     """
-    Image-conditioned generation. Deliberately one sample per generate()
-    call, NOT num_return_sequences - see module docstring for why.
+    Image-conditioned generation, in CHUNKS of `image_chunk` samples per
+    generate() call (2026-08-20, was one-sample-per-call).
+
+    The original one-at-a-time loop was a correct response to a real OOM
+    (scripts/expanded_length_check_tde.py, 2026-08-10: num_return_sequences
+    OOMs the vision encoder's attention, because HF's generate() replicates
+    pixel_values BEFORE the vision forward pass) - but "n=1" and "n=128"
+    are not the only options, and the cost of the safest one is severe:
+    at n=128 it means 128 sequential decodes per problem per condition,
+    which is what makes single-sequence throughput (~tens of tok/s) rather
+    than batched throughput (~865 tok/s aggregate, PLAN.md 9.2) the
+    binding constraint on evaluation cost. A modest chunk keeps the vision
+    tower's replicated activations bounded while recovering most of the
+    batching win; chunk size is a parameter precisely because the safe
+    ceiling is empirical, not derivable - calibrate it, don't assume it.
+
+    Falls back automatically: on a CUDA OOM the chunk is halved and
+    retried, down to 1 (the original, known-safe behaviour), so a
+    too-large chunk degrades performance instead of losing the run.
     """
     from qwen_vl_utils import process_vision_info
 
@@ -94,13 +155,83 @@ def _generate_image_batch(model, processor, image, instruction: str, n: int, max
     prompt_len = inputs["input_ids"].shape[1]
     pad_id = processor.tokenizer.pad_token_id
 
-    completions = []
-    for _ in range(n):
-        with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=True, temperature=temperature)
-        generated = out[0, prompt_len:]
-        nonpad = generated[generated != pad_id]
-        completions.append(processor.tokenizer.decode(nonpad, skip_special_tokens=True))
+    completions: list[str] = []
+    remaining = n
+    chunk = max(1, min(image_chunk, n))
+    while remaining > 0:
+        this_chunk = min(chunk, remaining)
+        try:
+            with torch.no_grad():
+                out = model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=True,
+                    temperature=temperature,
+                    num_return_sequences=this_chunk,
+                )
+        except torch.cuda.OutOfMemoryError:
+            if chunk == 1:
+                raise
+            chunk = max(1, chunk // 2)
+            torch.cuda.empty_cache()
+            print(f"[sampler] image generation OOM - halving chunk to {chunk} and retrying")
+            continue
+        for seq in out:
+            generated = seq[prompt_len:]
+            nonpad = generated[generated != pad_id]
+            completions.append(processor.tokenizer.decode(nonpad, skip_special_tokens=True))
+        remaining -= this_chunk
+    return completions
+
+
+def _generate_text_multi_prompt(
+    model,
+    processor,
+    prompt_texts: list[str],
+    max_new_tokens: int,
+    temperature: float,
+    batch_size: int = 16,
+) -> list[str]:
+    """
+    One completion for each of many DIFFERENT prompts, batched with left
+    padding (2026-08-20). Condition D needs exactly this: each of its n
+    samples has its own distinct transcription, so num_return_sequences
+    (same prompt, n outputs) does not apply, and the previous code fell
+    back to n separate single-sample calls - the slowest possible path.
+
+    Left padding is required for decoder-only generation: with right
+    padding the pads sit between the prompt and the first generated token
+    and corrupt the continuation. The tokenizer's padding_side is set
+    explicitly here rather than trusted, then restored.
+    """
+    tokenizer = processor.tokenizer
+    original_side = tokenizer.padding_side
+    tokenizer.padding_side = "left"
+    pad_id = tokenizer.pad_token_id
+    completions: list[str] = []
+    try:
+        for start in range(0, len(prompt_texts), batch_size):
+            batch = prompt_texts[start : start + batch_size]
+            prompts = [
+                processor.apply_chat_template(
+                    [{"role": "user", "content": [{"type": "text", "text": t}]}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+                for t in batch
+            ]
+            inputs = processor(text=prompts, return_tensors="pt", padding=True).to(model.device)
+            prompt_len = inputs["input_ids"].shape[1]
+            with torch.no_grad():
+                out = model.generate(
+                    **inputs, max_new_tokens=max_new_tokens, do_sample=True, temperature=temperature
+                )
+            for seq in out:
+                generated = seq[prompt_len:]
+                nonpad = generated[generated != pad_id]
+                completions.append(tokenizer.decode(nonpad, skip_special_tokens=True))
+    finally:
+        tokenizer.padding_side = original_side
     return completions
 
 
@@ -125,11 +256,14 @@ def sample_condition_e(
     n: int,
     max_new_tokens: int = DEFAULT_SOLVE_MAX_TOKENS,
     temperature: float = DEFAULT_TEMPERATURE,
+    image_chunk: int = DEFAULT_IMAGE_CHUNK,
 ) -> list[SampleResult]:
     """Condition E: n samples, image shown, perceive+reason in one pass."""
     image = render_problem_image(question)
     instruction = build_image_prompt()
-    completions = _generate_image_batch(model, processor, image, instruction, n, max_new_tokens, temperature)
+    completions = _generate_image_batch(
+        model, processor, image, instruction, n, max_new_tokens, temperature, image_chunk=image_chunk
+    )
     return [SampleResult(c, extract_model_answer(c)) for c in completions]
 
 
@@ -141,6 +275,7 @@ def sample_condition_d(
     transcribe_max_tokens: int = DEFAULT_TRANSCRIBE_MAX_TOKENS,
     solve_max_tokens: int = DEFAULT_SOLVE_MAX_TOKENS,
     temperature: float = DEFAULT_TEMPERATURE,
+    image_chunk: int = DEFAULT_IMAGE_CHUNK,
 ) -> list[SampleResult]:
     """
     Condition D: n independent (transcribe, then solve) pairs. Each
@@ -152,16 +287,18 @@ def sample_condition_d(
     image = render_problem_image(question)
     transcribe_instruction = build_transcribe_prompt()
     transcriptions = _generate_image_batch(
-        model, processor, image, transcribe_instruction, n, transcribe_max_tokens, temperature
+        model, processor, image, transcribe_instruction, n, transcribe_max_tokens, temperature,
+        image_chunk=image_chunk,
     )
 
-    results = []
-    for transcription in transcriptions:
-        solve_prompt = build_decomposed_solve_prompt(transcription)
-        solve_completions = _generate_text_batch(model, processor, solve_prompt, 1, solve_max_tokens, temperature)
-        completion = solve_completions[0]
-        results.append(SampleResult(completion, extract_model_answer(completion), transcription=transcription))
-    return results
+    solve_prompts = [build_decomposed_solve_prompt(t) for t in transcriptions]
+    solve_completions = _generate_text_multi_prompt(
+        model, processor, solve_prompts, solve_max_tokens, temperature
+    )
+    return [
+        SampleResult(completion, extract_model_answer(completion), transcription=transcription)
+        for completion, transcription in zip(solve_completions, transcriptions)
+    ]
 
 
 CONDITION_SAMPLERS = {

@@ -43,6 +43,7 @@ def run_sampling(
     problems: list[GSM8KExample],
     conditions: list[str],
     n: int,
+    progress_label: str = "",
     **sampler_kwargs,
 ) -> list[SamplingRecord]:
     """
@@ -54,11 +55,35 @@ def run_sampling(
         if c not in CONDITION_SAMPLERS:
             raise ValueError(f"Unknown condition {c!r}, must be one of {list(CONDITION_SAMPLERS)}")
 
+    # Filter kwargs per condition rather than forwarding blindly: the
+    # conditions have genuinely different knobs (image_chunk is meaningful
+    # for D/E, meaningless for text-only T; transcribe_max_tokens only
+    # exists on D), so a single **sampler_kwargs passed to all three
+    # raises TypeError on the first condition that doesn't take one. The
+    # caller should be able to pass the union of options and have each
+    # condition take what applies to it.
+    import inspect
+    import time
+
+    # Per-problem progress with a live ETA. Evaluation is a multi-hour job
+    # whose only external signal was previously "the container is still
+    # alive" - there was no way to distinguish steady progress from a hang,
+    # the same blind spot that made the training runs hard to reason about
+    # until streamed [progress] lines were added there.
+    started = time.time()
+    total = len(problems)
+
+    def _hms(seconds: float) -> str:
+        seconds = int(max(seconds, 0))
+        return f"{seconds // 3600:d}h{(seconds % 3600) // 60:02d}m{seconds % 60:02d}s"
+
     records: list[SamplingRecord] = []
-    for problem in problems:
+    for problem_no, problem in enumerate(problems, start=1):
         for condition in conditions:
             sampler_fn = CONDITION_SAMPLERS[condition]
-            samples = sampler_fn(model, processor, problem.question, n=n, **sampler_kwargs)
+            accepted = inspect.signature(sampler_fn).parameters
+            kwargs = {k: v for k, v in sampler_kwargs.items() if k in accepted}
+            samples = sampler_fn(model, processor, problem.question, n=n, **kwargs)
             for sample_idx, sample in enumerate(samples):
                 records.append(
                     SamplingRecord(
@@ -73,6 +98,20 @@ def run_sampling(
                         correct=(sample.extracted_answer == problem.final_answer),
                     )
                 )
+
+        elapsed = time.time() - started
+        per_problem = elapsed / problem_no
+        remaining = (total - problem_no) * per_problem
+        correct_so_far = sum(1 for r in records if r.correct)
+        tag = f"{progress_label} " if progress_label else ""
+        print(
+            f"[eval] {tag}problem {problem_no}/{total}"
+            f" | elapsed {_hms(elapsed)}"
+            f" | {per_problem:.0f}s/problem"
+            f" | ETA {_hms(remaining)}"
+            f" | running acc {correct_so_far / max(len(records), 1):.3f}",
+            flush=True,
+        )
     return records
 
 
