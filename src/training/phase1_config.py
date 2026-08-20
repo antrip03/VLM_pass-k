@@ -312,6 +312,18 @@ def build_args(
         # pure dead time for a short smoke test whose only question is
         # whether the first training step crashes - hence configurable.
         f"trainer.val_before_train={val_before_train}",
+        # total_epochs=1, with total_training_steps=467 as the real target
+        # (decided 2026-08-19). GSM8K's train split is 7473 examples and
+        # data.train_batch_size=16 prompts/step, so ONE epoch is exactly
+        # 7473/16 = 467.06 -> 467 steps. The original config asked for 500
+        # steps with total_epochs=1, which is unreachable: two runs stopped
+        # dead at 467, and veRL's end-of-epoch DataLoader teardown surfaced
+        # as a misleading "RuntimeError: DataLoader worker ... killed by
+        # signal: Killed" that reads like an OOM but is not.
+        # Raising to 2 epochs would reach 500, but the last 33 steps would
+        # be a SECOND pass over the first ~528 examples - every prompt seen
+        # once except those, seen twice. 467 is the cleaner experiment:
+        # exactly one pass, every prompt seen exactly once, no repetition.
         "trainer.total_epochs=1",
         f"trainer.total_training_steps={total_training_steps}",
         f"trainer.default_local_dir={checkpoint_dir}",

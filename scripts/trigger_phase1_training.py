@@ -51,11 +51,24 @@ def main() -> None:
         print("WANDB_API_KEY not set locally - training will run WITHOUT wandb logging (console only).")
 
     hf_token = os.environ.get("HF_TOKEN")
+    if hf_token and os.environ.get("SKIP_HF_SYNC"):
+        # Escape hatch added after a host-RAM OOM killed a run at step
+        # 467/500: the in-process mirror uploads multi-GB checkpoints
+        # repeatedly over many hours and is the prime suspect for gradual
+        # memory growth. Set SKIP_HF_SYNC=1 to run without it (checkpoints
+        # still persist on the Modal Volume; only the cross-account backup
+        # is skipped).
+        print("SKIP_HF_SYNC set - NOT attaching HF_TOKEN; checkpoints will live on the Modal Volume only.")
+        hf_token = None
     if hf_token:
         print("HF_TOKEN found locally - attaching it so checkpoints get mirrored to a private HF Hub repo.")
         secrets["HF_TOKEN"] = hf_token
     else:
         print("HF_TOKEN not set locally - checkpoints will only live on the Modal Volume.")
+
+    if os.environ.get("SKIP_VAL"):
+        print("SKIP_VAL set - skipping veRL's full-test-set validation pass before training.")
+        secrets["SKIP_VAL"] = "1"
 
     training_fn = run_training.with_options(secrets=[modal.Secret.from_dict(secrets)]) if secrets else run_training
 

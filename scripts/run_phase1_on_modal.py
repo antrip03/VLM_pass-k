@@ -121,8 +121,12 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
         checkpoint_every=25,
         # Short runs are smoke tests (does the first training step survive?)
         # - skip veRL's ~8min full-test-set baseline validation for those,
-        # keep it for real runs where the baseline is actual data.
-        val_before_train=total_training_steps > 10,
+        # keep it for real runs where the baseline is actual data. SKIP_VAL
+        # additionally forces it off for short RESUME runs, where the
+        # validation pass can cost more than the handful of remaining
+        # training steps (our own T/D/E harness evaluates checkpoints
+        # offline anyway - see phase1_config.py's module docstring).
+        val_before_train=total_training_steps > 10 and not os.environ.get("SKIP_VAL"),
     )
 
     env = os.environ.copy()
@@ -247,10 +251,20 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
                 break
 
         proc.wait(timeout=120)
-        returncode =   -1 if timed_out else proc.returncode
+        returncode = -1 if timed_out else proc.returncode
         text_tail = "\n".join(tail)
         stdout_tail = text_tail[-8000:]
         stderr_tail = text_tail[-3000:]  # stderr is merged into stdout now
+
+        # Exit code alone is NOT trustworthy here (real case 2026-08-19: a
+        # host-RAM OOM SIGKILLed a DataLoader worker at step 467/500, Ray
+        # swallowed the worker failure, and the driver still exited 0 - a
+        # crashed run reporting success). Treat "did not reach the target
+        # step" as failure regardless of exit code.
+        if returncode == 0 and not timed_out and prev_step < total_training_steps:
+            print(f"[progress] WARNING: process exited 0 but only reached step {prev_step}/"
+                  f"{total_training_steps} - treating as FAILURE, not success.", flush=True)
+            returncode = 1
     finally:
         # Explicit commit regardless of how the subprocess ended (success,
         # failure, or timeout) - belt-and-suspenders on top of Modal's own
@@ -263,6 +277,8 @@ def run_training(total_training_steps: int, wandb_mode_disabled: bool) -> dict:
     return {
         "returncode": returncode,
         "timed_out": timed_out,
+        "last_step": prev_step,
+        "total_training_steps": total_training_steps,
         "stdout_tail": stdout_tail,
         "stderr_tail": stderr_tail,
     }
