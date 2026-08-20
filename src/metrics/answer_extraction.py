@@ -39,8 +39,32 @@ from __future__ import annotations
 
 import re
 
-_HASH_ANSWER_RE = re.compile(r"####\s*(-?[\d,]+(?:\.\d+)?)")
-_BOXED_ANSWER_RE = re.compile(r"\\boxed\{(-?[\d,]+(?:\.\d+)?)\}")
+# Decoration tolerance added 2026-08-20 after a real 50-problem eval run
+# measured a 21-27% "no answer extracted" rate (T 21.2%, D 21.5%, E 26.9%)
+# whose completions were NOT truncated - 98.1% of them had a digit within
+# the last 120 characters, and their mean length (806 chars) was close to
+# that of successfully-parsed completions (747). Inspecting them showed
+# the model HAD complied with the requested "####" convention, but
+# decorated the number in ways this pattern rejected:
+#     "#### <18>"     angle brackets
+#     "#### \$18"     escaped dollar sign
+#     "#### $18"      currency marker
+# The old pattern demanded a digit immediately after optional whitespace,
+# so every one of these scored as no-answer, i.e. wrong.
+#
+# This mattered beyond a headline accuracy number: src/training/reward_fn.py
+# uses this same extractor, so RL was rewarded specifically for producing
+# cleanly-parseable answers. If the trained model learned to emit bare
+# "#### 18" while the base model emits "#### <18>", the measured
+# Delta would partly reflect FORMAT COMPLIANCE rather than reasoning -
+# manufacturing an apparent gain. Tolerating the decoration removes that
+# confound rather than merely raising the accuracy numbers.
+#
+# The allowed prefix is a bounded set of known decoration characters, not
+# a permissive ".*?" - the point is to accept a decorated marker, never to
+# start scanning for arbitrary nearby numbers.
+_HASH_ANSWER_RE = re.compile(r"####[\s\\$<>*`~\"'(\[\{]{0,8}(-?[\d,]+(?:\.\d+)?)")
+_BOXED_ANSWER_RE = re.compile(r"\\boxed\{[\s\\$]{0,4}(-?[\d,]+(?:\.\d+)?)")
 
 
 def extract_model_answer(generated_text: str) -> str | None:

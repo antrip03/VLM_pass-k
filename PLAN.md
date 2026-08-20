@@ -160,11 +160,63 @@ Only proceed here once Phase 1 produces a real, seed-validated Δ_text (i.e., th
 
 ## 4. Evaluation Pipeline (once inference is done)
 
+> ### ✅ PHASE 1 RESULT — measured 2026-08-20
+>
+> Real run: Qwen2.5-VL-3B-Instruct, Dr. GRPO 467 steps (one clean epoch), text-only GSM8K training.
+> Evaluation: 50 GSM8K test problems × n=128 samples × conditions T/D/E × {base, RL}
+> (38,400 generations total, ~3.3hr per model on one A10G, ~$9).
+> Both models scored with the **same** corrected extractor (see the extraction note below).
+>
+> | Condition | k | base | RL | Δ (95% CI, paired bootstrap) |
+> |---|---|---|---|---|
+> | **T** text | 1 | 0.6089 | 0.6677 | **+0.0587** [+0.0406, +0.0763] ✅ |
+> | | 64 | 0.9764 | 0.9963 | +0.0199 [−0.000, +0.0575] ✗ |
+> | **D** transcribe→solve | 1 | 0.6031 | 0.6750 | **+0.0719** [+0.0558, +0.0889] ✅ |
+> | | 64 | 0.9792 | 0.9797 | +0.0005 ✅(trivial) |
+> | **E** end-to-end image | 1 | 0.4961 | 0.5886 | **+0.0925** [+0.0695, +0.1161] ✅ |
+> | | 64 | 0.9896 | 0.9797 | −0.0099 [−0.030, +0.0002] ✗ |
+>
+> **Finding 1 — the text-only RL gain SURVIVES the modality shift.** This is NOT §3's
+> Scenario A (Collapse): Δ_pixel (+9.3pts) is not ≈0 and is not ≪ Δ_text (+5.9pts). The
+> vision tower is byte-identical before/after training (sha256 verified, item 8 below), so
+> the transfer is entirely in the reasoning pathway, not perception.
+>
+> **Finding 2 — textbook sharpening signature.** Every condition's base pass@64 is already
+> 0.976–0.990: the base model can already reach nearly every problem given enough samples.
+> RL lifts pass@1 by 6–9 points while pass@64 stays at ceiling or declines (E: −0.0099).
+> RL is redistributing probability mass toward answers already in reach, not expanding
+> coverage — Yue et al. 2504.13837's claim, reproduced on a VLM and across a modality shift.
+>
+> **Honest limits on the above, to state in the paper, not bury:**
+> - **Δ_pixel > Δ_text is partly a floor effect.** E starts far lower (0.496 vs 0.609), so it
+>   has more headroom. Do NOT claim images benefit *more* from text-only RL; claim the gain
+>   transfers *at least as well*, which is what the data supports.
+> - **pass@64 is ceiling-limited.** At 0.98–0.99 there is almost no room to detect coverage
+>   expansion, so "no expansion" and "cannot tell" are hard to separate here. §9 anticipated
+>   exactly this (GSM8K saturates pass@k early). A harder dataset is required to test the
+>   sharpening claim strongly, not just consistently.
+> - Single seed, 50 problems — the CIs are sampling-noise-only (§10 item 8).
+>
+> **Measurement bug found and fixed — this changed the headline number by ~40%.** The
+> extractor demanded a digit immediately after `####`, so real, correct completions ending
+> `#### <18>`, `#### \$18`, `#### $18` scored as no-answer. Rates were 21–27% (base) and were
+> NOT truncation: 98.1% of unparsed completions had a digit in their last 120 chars, and their
+> mean length (806 chars) matched parsed ones (747). Critically the rate was **asymmetric
+> between models** — base 21.2% vs RL 5.9% on T — because `src/training/reward_fn.py` uses this
+> same extractor, so RL was explicitly rewarded for emitting parseable answers. Uncorrected,
+> Δ_text reads **+0.099 instead of +0.059**: roughly 40% of the apparent "reasoning gain" was
+> format compliance. Fixed in `src/metrics/answer_extraction.py`; both models re-scored from
+> saved completions via `scripts/rescore_records.py` (no regeneration needed). A residual
+> asymmetry remains (E still parses worse than T: base 21.0% vs 13.4%), so part of the T→E
+> level gap is still measurement rather than capability.
+
+
+
 1. **Calibration step, mandatory before trusting anything else**: run the untouched base model on GSM8K-V (or the relevant condition) and check the result is in the right ballpark of a known published number (e.g., Gemini-2.5-Pro scored 46.93% on GSM8K-V — not directly comparable to a 3B model, but a sanity check that the pipeline isn't producing absurd numbers like near-0% or near-100%). If this fails, debug the pipeline before trusting any RL-vs-base comparison built on top of it.
 2. **Answer extraction**: regex-extract the model's final numeric answer, matching GSM8K's standard `#### [number]` convention. Normalize formatting (commas, decimals) before comparing.
 3. **Correctness check**: exact numeric match against ground truth. (GSM8K/GSM8K-V's clean numeric answers avoid needing an LLM-judge or symbolic-equivalence tool — a deliberate, lower-risk choice.)
 4. **Transcription fidelity** (Condition D only): compare the model's self-transcription against the ground-truth problem text (exact/normalized match) — gives a directly reportable "transcription accuracy" metric.
-5. **Extraction spot-check**: manually review a sample of outputs from *each* condition (T/D/E) before trusting the regex at scale — a regex tuned on text-mode output isn't guaranteed to match image-mode phrasing habits.
+5. **Extraction spot-check**: manually review a sample of outputs from *each* condition (T/D/E) before trusting the regex at scale — a regex tuned on text-mode output isn't guaranteed to match image-mode phrasing habits. **DONE 2026-08-20 and it caught a real, result-changing bug** — see the Phase 1 result box above and `scripts/diagnose_no_answer.py`. This item earned its place: without it the reported Δ_text would have been inflated ~40% by format compliance, invisibly.
 6. **Sampling**: n ≈ 128 samples per problem (enough margin for pass@k up to k≈64). Temperature swept per model per k, not one fixed value for everyone (pass@k is documented to be temperature-sensitive).
 7. **pass@k computation**: unbiased estimator (§2.1 formula), at minimum k=1 and k=64. **Do not brute-force k=512** — verified (§5) this isn't done anywhere for VLMs at this scale, and separately, GSM8K-level problems saturate pass@k early for capable models, so k=512 likely adds cost without adding signal. If a large-k number is wanted for comparison with the Yue-et-al.-style literature, use the extrapolation method (arXiv 2510.05197) instead of raw sampling.
 8. **Uncertainty**: bootstrap or Bayesian confidence intervals on every reported Δ — never a bare point estimate.
