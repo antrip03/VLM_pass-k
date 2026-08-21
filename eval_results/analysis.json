@@ -1,0 +1,164 @@
+{
+  "pass_at_k": {
+    "base/T/k=1": {
+      "mean": 0.6089,
+      "ci": [
+        0.5341,
+        0.6806
+      ]
+    },
+    "rl/T/k=1": {
+      "mean": 0.6677,
+      "ci": [
+        0.587,
+        0.745
+      ]
+    },
+    "base/T/k=64": {
+      "mean": 0.9764,
+      "ci": [
+        0.9339,
+        1.0
+      ]
+    },
+    "rl/T/k=64": {
+      "mean": 0.9963,
+      "ci": [
+        0.9902,
+        1.0
+      ]
+    },
+    "base/D/k=1": {
+      "mean": 0.6031,
+      "ci": [
+        0.5297,
+        0.6731
+      ]
+    },
+    "rl/D/k=1": {
+      "mean": 0.675,
+      "ci": [
+        0.5959,
+        0.7511
+      ]
+    },
+    "base/D/k=64": {
+      "mean": 0.9792,
+      "ci": [
+        0.9387,
+        0.9999
+      ]
+    },
+    "rl/D/k=64": {
+      "mean": 0.9797,
+      "ci": [
+        0.9394,
+        1.0
+      ]
+    },
+    "base/E/k=1": {
+      "mean": 0.4961,
+      "ci": [
+        0.4247,
+        0.5653
+      ]
+    },
+    "rl/E/k=1": {
+      "mean": 0.5886,
+      "ci": [
+        0.5031,
+        0.6719
+      ]
+    },
+    "base/E/k=64": {
+      "mean": 0.9896,
+      "ci": [
+        0.9694,
+        1.0
+      ]
+    },
+    "rl/E/k=64": {
+      "mean": 0.9797,
+      "ci": [
+        0.9394,
+        1.0
+      ]
+    }
+  },
+  "deltas": {
+    "Delta_T/k=1": {
+      "delta": 0.0587,
+      "ci": [
+        0.0406,
+        0.0763
+      ],
+      "significant": true
+    },
+    "Delta_T/k=64": {
+      "delta": 0.02,
+      "ci": [
+        -0.0,
+        0.0575
+      ],
+      "significant": false
+    },
+    "Delta_D/k=1": {
+      "delta": 0.0719,
+      "ci": [
+        0.0558,
+        0.0889
+      ],
+      "significant": true
+    },
+    "Delta_D/k=64": {
+      "delta": 0.0005,
+      "ci": [
+        0.0,
+        0.0012
+      ],
+      "significant": true
+    },
+    "Delta_E/k=1": {
+      "delta": 0.0925,
+      "ci": [
+        0.0695,
+        0.1161
+      ],
+      "significant": true
+    },
+    "Delta_E/k=64": {
+      "delta": -0.0099,
+      "ci": [
+        -0.03,
+        0.0002
+      ],
+      "significant": false
+    }
+  },
+  "headline": {
+    "Delta_text (condition T, k=1)": {
+      "delta": 0.0587,
+      "ci": [
+        0.0406,
+        0.0763
+      ],
+      "significant": true
+    },
+    "Delta_pixel (condition E, k=1)": {
+      "delta": 0.0925,
+      "ci": [
+        0.0695,
+        0.1161
+      ],
+      "significant": true
+    },
+    "Delta_decomposed (condition D, k=1)": {
+      "delta": 0.0719,
+      "ci": [
+        0.0558,
+        0.0889
+      ],
+      "significant": true
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "model_kind": "rl",
+  "n": 128,
+  "problems": 50,
+  "records": 19200,
+  "elapsed_hr": 3.04,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "no_answer_rate": {
+    "T": 0.0591,
+    "D": 0.0533,
+    "E": 0.0805
+  },
+  "accuracy": {
+    "T": 0.6564,
+    "D": 0.6647,
+    "E": 0.5817
+  },
+  "out_path": "/results/records_rl.parquet"
+}

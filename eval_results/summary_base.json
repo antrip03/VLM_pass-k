@@ -1,0 +1,19 @@
+{
+  "model_kind": "base",
+  "n": 128,
+  "problems": 50,
+  "records": 19200,
+  "elapsed_hr": 3.33,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "no_answer_rate": {
+    "T": 0.212,
+    "D": 0.2148,
+    "E": 0.2692
+  },
+  "accuracy": {
+    "T": 0.5575,
+    "D": 0.5477,
+    "E": 0.4633
+  },
+  "out_path": "/results/records_base.parquet"
+}
