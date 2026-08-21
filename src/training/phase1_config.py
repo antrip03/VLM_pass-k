@@ -90,6 +90,7 @@ def build_args(
     checkpoint_every: int = 100,
     seed: int = 0,
     val_before_train: bool = True,
+    experiment_name: str = "qwen2_5_vl_3b_phase1",
 ) -> list[str]:
     """
     Returns the full Hydra CLI arg list for `python3 -m verl.trainer.main_ppo`.
@@ -299,7 +300,15 @@ def build_args(
         # expected until a real (rotated) key is exported on the VM.
         "trainer.logger=[console,wandb]",
         "trainer.project_name=grpo-vlm-modality-shift",
-        "trainer.experiment_name=qwen2_5_vl_3b_phase1",
+        # Parameterised 2026-08-22 for the Phase 1b random-reward control
+        # (src/training/reward_fn_random.py). That run MUST NOT share an
+        # experiment name with the real Phase 1 run: veRL derives the
+        # wandb run identity from it, so a collision would interleave two
+        # incompatible training curves under one name and make the
+        # step-matched comparison unreadable. The checkpoint directory is
+        # already a separate parameter, so passing both keeps the control
+        # fully isolated from the result it is defending.
+        f"trainer.experiment_name={experiment_name}",
         "trainer.n_gpus_per_node=1",
         "trainer.nnodes=1",
         f"trainer.save_freq={checkpoint_every}",
