@@ -274,7 +274,7 @@ def eval_control_model(which: str, n: int, problems: int, conditions: list[str],
 
 
 @app.function(image=image, volumes={RESULTS_DIR: results_volume}, timeout=60 * 60)
-def analyze_control(conditions: list[str] | None = None) -> dict:
+def analyze_control(conditions: str = "T,E") -> dict:
     """
     The control's verdict: does the gain survive when the reward is
     severed from correctness?
@@ -288,7 +288,9 @@ def analyze_control(conditions: list[str] | None = None) -> dict:
     from src.inference.run_sampling import load_sampling_records
     from src.metrics.bootstrap_ci import bootstrap_delta_ci
 
-    conditions = conditions or EVAL_CONDITIONS
+    # Comma-separated string, not list[str] - see analyze_variant.
+    conditions = [c.strip() for c in conditions.replace(",", " ").split()
+                  if c.strip() in ("T", "D", "E")] or EVAL_CONDITIONS
 
     def per_problem(which: str, condition: str):
         df = load_sampling_records(f"{RESULTS_DIR}/control_records_{which}.parquet")

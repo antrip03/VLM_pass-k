@@ -150,7 +150,7 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
 
 
 @app.function(image=image, volumes={RESULTS_DIR: results_volume}, timeout=60 * 60)
-def analyze_trajectory(labels: list[str]) -> dict:
+def analyze_trajectory(labels: str) -> dict:
     """
     Assemble the per-checkpoint summaries into a trajectory, with paired
     bootstrap CIs on Delta_text at each step relative to base.
@@ -163,6 +163,14 @@ def analyze_trajectory(labels: list[str]) -> dict:
 
     from src.inference.run_sampling import load_sampling_records
     from src.metrics.bootstrap_ci import bootstrap_delta_ci
+
+    # Accept a comma-separated string: `modal run ...::analyze_trajectory
+    # --labels "base,step_25"` passes a STRING, not a list, so a
+    # list[str] annotation would receive one long label and fail on a
+    # missing file rather than on the real cause.
+    labels = [x.strip() for x in labels.split(",") if x.strip()]
+    if "base" not in labels:
+        raise ValueError("labels must include 'base' - it is the reference for every Delta")
 
     def per_problem(label: str):
         df = load_sampling_records(f"{RESULTS_DIR}/trajectory_records_{label}.parquet")

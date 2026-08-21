@@ -170,12 +170,18 @@ def eval_variant(
 
 
 @app.function(image=image, volumes={RESULTS_DIR: results_volume}, timeout=60 * 60)
-def analyze_variant(tag: str, conditions: list[str]) -> dict:
+def analyze_variant(tag: str, conditions: str = "T,D,E") -> dict:
     """
     pass@k and paired-bootstrap Deltas on a variant set, plus the
     ceiling verdict that decides whether Finding 2 is testable here.
     """
     import json
+
+    # Comma-separated string, not list[str]: invoked from the CLI,
+    # where Modal passes the raw string through.
+    conditions = [c.strip() for c in conditions.replace(",", " ").split() if c.strip() in ("T", "D", "E")]
+    if not conditions:
+        raise ValueError("conditions must name at least one of T, D, E")
 
     from src.analysis.coverage import full_coverage_report
     from src.inference.run_sampling import load_sampling_records

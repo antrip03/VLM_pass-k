@@ -154,6 +154,70 @@ def truncation_report(df, max_new_tokens: int) -> dict:
     return out
 
 
+def leakage_report(n_problems: int, include_variants: bool) -> dict:
+    """
+    Train/eval leakage (PLAN.md Section 4, `src/data/leakage_check.py`).
+
+    Two checks, the second of which is new in Phase 1b:
+
+      1. The canonical one - do any of the evaluation problems appear in
+         the training split? overlap_count must be 0 or every downstream
+         number is contaminated.
+
+      2. The GSM-Plus variants. These are derived from GSM8K *test*, and
+         training used *train*, so leakage should be impossible - but
+         "should be impossible" is exactly the kind of assumption this
+         project has been burned by before (the 500-step target was also
+         assumed reachable). A rephrasing could in principle collide with
+         a training item, and the check is nearly free, so it is run
+         rather than argued.
+
+    Requires network access to load the datasets; skipped with a clear
+    note rather than a crash when unavailable.
+    """
+    try:
+        from src.data.gsm8k_loader import load_gsm8k
+        from src.data.leakage_check import check_train_eval_leakage
+    except Exception as e:  # noqa: BLE001
+        return {"skipped": f"import failed: {e}"}
+
+    try:
+        train = load_gsm8k("train")
+        evalset = load_gsm8k("test")[:n_problems]
+    except Exception as e:  # noqa: BLE001
+        return {"skipped": f"could not load GSM8K (offline?): {e}"}
+
+    out = {"gsm8k_eval_vs_train": check_train_eval_leakage(train, evalset)}
+    out["gsm8k_eval_vs_train"].pop("overlap_questions", None)
+
+    if include_variants:
+        try:
+            from src.data.harder_datasets import (
+                load_harder_for_problems,
+                load_rephrased_for_problems,
+            )
+
+            for name, loader in (
+                ("gsmplus_harder_vs_train", load_harder_for_problems),
+                ("gsmplus_rephrased_vs_train", load_rephrased_for_problems),
+            ):
+                variants, stats = loader(evalset)
+                res = check_train_eval_leakage(train, variants)
+                res.pop("overlap_questions", None)
+                res["variant_coverage"] = stats["coverage"]
+                out[name] = res
+        except Exception as e:  # noqa: BLE001
+            out["variants"] = {"skipped": f"could not load GSM-Plus: {e}"}
+
+    hard_fail = [k for k, v in out.items() if isinstance(v, dict) and v.get("overlap_count", 0) > 0]
+    out["verdict"] = (
+        f"LEAKAGE DETECTED in {hard_fail} - results are contaminated, stop and investigate."
+        if hard_fail
+        else "No train/eval overlap detected."
+    )
+    return out
+
+
 def transcription_report(df) -> dict:
     """Condition-D transcription fidelity, per model (PLAN.md Section 4 item 4)."""
     from src.metrics.transcription_fidelity import mean_transcription_fidelity
@@ -181,6 +245,10 @@ def main() -> None:
     ap.add_argument("--review-dir", default="review_pack")
     ap.add_argument("--max-new-tokens", type=int, default=1200)
     ap.add_argument("--traces-per-model", type=int, default=25)
+    ap.add_argument("--no-leakage", action="store_true",
+                    help="skip the leakage check (it needs network access to load GSM8K)")
+    ap.add_argument("--no-variants", action="store_true",
+                    help="leakage check: skip the GSM-Plus variant checks (needs a second download)")
     args = ap.parse_args()
 
     df = load_paired_records(args.base, args.rl)
@@ -207,6 +275,11 @@ def main() -> None:
         "difficulty_matched": full_difficulty_report(df),
         "truncation": truncation_report(df, args.max_new_tokens),
         "transcription_fidelity": transcription_report(df),
+        "leakage": (
+            {"skipped": "--no-leakage passed"}
+            if args.no_leakage
+            else leakage_report(df["problem_idx"].nunique(), include_variants=not args.no_variants)
+        ),
     }
 
     traces = []
@@ -236,6 +309,9 @@ def main() -> None:
     for key in ("stratified_T_vs_E", "stratified_T_vs_D"):
         v = report["difficulty_matched"].get(key, {})
         print(f"  {key}: {v.get('verdict') or v.get('note')}")
+
+    print("\n=== LEAKAGE ===")
+    print(f"  {report['leakage'].get('verdict') or report['leakage'].get('skipped')}")
 
 
 if __name__ == "__main__":
