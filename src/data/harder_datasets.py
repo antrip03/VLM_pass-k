@@ -399,9 +399,57 @@ def load_rephrased_for_problems(problems, **kw):
     return load_gsm_plus_for_problems(problems, (PERTURBATION_REPHRASE,), **kw)
 
 
+MATH500_SCREEN_LEVELS = (3, 4, 5)
+
+
+def load_math500_for_problems(problems, levels=MATH500_SCREEN_LEVELS, **kw):
+    """
+    MATH-500 in the registry's signature, so the eval scripts can screen
+    it without special-casing.
+
+    TWO DIFFERENCES FROM THE GSM-PLUS LOADERS, BOTH DELIBERATE:
+
+    1. `problems` is used ONLY for its length. MATH-500 is not derived
+       from GSM8K, so there is no seed problem to match against, and idx
+       is assigned 0..N-1 fresh. That means these records DO NOT pair with
+       the Phase 1 parquets by problem_idx - correctly, since they are a
+       different dataset. Base and RL records still pair with each other,
+       which is all the paired bootstrap on Delta requires.
+
+    2. Levels 3-5 by default. Verified locally 2026-08-22: the numeric-only
+       filter retains 64% of MATH-500 overall (320/500) and 61% at levels
+       3-5 (225 items), so there is ample material after filtering.
+
+    TRUNCATION IS THE RISK TO WATCH. MATH solutions run longer than GSM8K's
+    and the generation cap is 1200 tokens. If the screen's no_answer_rate
+    comes back well above the ~0.125 seen on GSM-Plus, suspect the cap
+    rather than the model, and check completion lengths before trusting
+    any accuracy number from this set.
+    """
+    n = len(problems)
+    examples, stats = load_math500(limit=n, numeric_only=True, levels=levels, **kw)
+    # Normalise to the registry's stats contract. eval_variant reads
+    # problems_matched / problems_missing / coverage from every loader, and
+    # load_math500 natively reports examples_returned instead - without
+    # this the screen would crash on a KeyError after the model had already
+    # loaded, i.e. after paying for the GPU.
+    stats.update(
+        {
+            "problems_requested": n,
+            "problems_matched": len(examples),
+            "problems_missing": [],
+            "coverage": round(len(examples) / n, 4) if n else None,
+            "type_breakdown": {f"MATH level {l}": None for l in (levels or ())},
+            "pairs_with_phase1_records": False,
+        }
+    )
+    return examples, stats
+
+
 # Registry so scripts can name a dataset on the command line rather than
 # importing a specific loader - keeps the eval scripts dataset-agnostic.
 HARDER_DATASETS = {
     "gsmplus_harder": load_harder_for_problems,
     "gsmplus_rephrased": load_rephrased_for_problems,
+    "math500": load_math500_for_problems,
 }
