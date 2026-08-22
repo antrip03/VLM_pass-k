@@ -413,6 +413,13 @@ def evaluate(n: int = EVAL_N, problems: int = EVAL_PROBLEMS, conditions: str = "
     for which in ("base", "real250", "random250"):
         calls[which] = fn.spawn(which, n, problems, cond_list, image_chunk)
         print(f"  {which}: call_id={calls[which].object_id}")
+    # BLOCK - see the module docstring. An un-awaited spawn is killed when
+    # `modal run` tears the app down on entrypoint return.
+    print("\nWaiting for results (use `modal run --detach` for long runs)...")
+    for which, call in calls.items():
+        r = call.get()
+        print(f"  {which:>10}: {r['per_condition']}")
+
     print("\nWhen finished:")
     print(f'  modal run scripts/run_random_reward_control_on_modal.py::analyze_control '
           f'--conditions "{",".join(cond_list)}"')

@@ -1,0 +1,46 @@
+{
+  "tag": "gsmplus_harder_screen",
+  "dataset": "gsmplus_harder",
+  "model_kind": "base",
+  "n": 64,
+  "problems": 20,
+  "conditions": [
+    "T"
+  ],
+  "records": 1280,
+  "elapsed_hr": 0.14,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "dataset_stats": {
+    "repo": "qintongli/GSM-Plus",
+    "split": "test",
+    "perturbation_types": [
+      "adding operation",
+      "reversing operation",
+      "distraction insertion",
+      "digit expansion"
+    ],
+    "problems_requested": 20,
+    "problems_matched": 20,
+    "problems_missing": [],
+    "coverage": 1.0,
+    "type_breakdown": {
+      "adding operation": 4,
+      "reversing operation": 5,
+      "distraction insertion": 7,
+      "digit expansion": 4
+    },
+    "seed": 0
+  },
+  "per_condition": {
+    "T": {
+      "pass_at_1": 0.5094,
+      "pass_at_1_fallback": 0.5758,
+      "pass_at_8": 0.8398,
+      "pass_at_64": 0.95,
+      "pass_at_64_fallback": 0.95,
+      "no_answer_rate": 0.125,
+      "format_compliance_rate": 0.875
+    }
+  },
+  "out_path": "/results/gsmplus_harder_screen_records_base.parquet"
+}

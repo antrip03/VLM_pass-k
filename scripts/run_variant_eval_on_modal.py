@@ -349,7 +349,23 @@ def main(
         calls[kind] = fn.spawn(dataset, kind, n, problems, cond_list, image_chunk, tag)
         print(f"  {kind}: call_id={calls[kind].object_id}")
 
-    print("\nSpawned - safe to disconnect. When finished:")
+    # BLOCK until every call finishes. `modal run` tears the app down the
+    # moment this entrypoint returns, so a spawn that is never awaited is
+    # killed - observed live 2026-08-22, twice, each time leaving an empty
+    # results volume. Use `modal run --detach` for multi-hour runs so the
+    # app survives a dropped local connection.
+    print("\nWaiting for results (use `modal run --detach` for long runs)...")
+    for kind, call in calls.items():
+        result = call.get()
+        print(f"  {kind}: done in {result.get('elapsed_hr')}hr")
+        for cond, v in result.get("per_condition", {}).items():
+            print(
+                f"    {cond}: pass@1 strict={v['pass_at_1']} fallback={v['pass_at_1_fallback']}"
+                f" | pass@64 strict={v['pass_at_64']} fallback={v['pass_at_64_fallback']}"
+                f" | format-compliance={v['format_compliance_rate']}"
+            )
+
+    print("\nNext:")
     if mode == "full":
         print(f'  modal run scripts/run_variant_eval_on_modal.py::analyze_variant '
               f'--tag "{tag}" --conditions "{",".join(cond_list)}"')

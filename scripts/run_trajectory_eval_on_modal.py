@@ -326,6 +326,16 @@ def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool =
         calls[label] = fn.spawn(step, n, problems)
         print(f"  {label}: call_id={calls[label].object_id}")
 
-    print("\nAll spawned - safe to disconnect. When they finish, run:")
+    # BLOCK - see the module docstring. An un-awaited spawn is killed when
+    # `modal run` tears the app down on entrypoint return.
+    print("\nWaiting for results (use `modal run --detach` for long runs)...")
+    for label, call in calls.items():
+        r = call.get()
+        print(f"  {label:>10}: pass@1 strict={r['pass_at_1']} "
+              f"fallback={r.get('pass_at_1_fallback')} "
+              f"| format-compliance={r.get('format_compliance_rate')} "
+              f"| {r['elapsed_min']}min")
+
+    print("\nWhen they finish, run:")
     labels = ",".join(calls)
     print(f'  modal run scripts/run_trajectory_eval_on_modal.py::analyze_trajectory --labels "{labels}"')
