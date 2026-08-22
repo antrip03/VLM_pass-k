@@ -44,6 +44,43 @@
 > under both scorings. The paper's likely reframing is in the closing
 > section.
 
+> ### Step 2 screens — results (2026-08-22, $0.48 total)
+>
+> Base model, 20 problems x n=64, condition T. Pre-registered rule:
+> pass@64 >= 0.95 = still saturated; < 0.85 = ceiling broken.
+>
+> | Dataset | pass@1 strict | pass@1 fallback | format gap | pass@64 | no-answer | Verdict |
+> |---|---|---|---|---|---|---|
+> | GSM8K (Phase 1) | 0.609 | 0.699 | 9.0 pts | 0.979 | 0.134 | saturated |
+> | GSM-Plus harder | 0.509 | 0.576 | 6.7 pts | 0.950 | 0.125 | **still saturated** |
+> | **MATH-500 L3-5** | 0.386 | 0.408 | 2.2 pts | **0.800** | 0.121 | ✅ **ceiling broken** |
+>
+> **MATH-500 is the set to use.** 20 points of dynamic range instead of 2,
+> and no truncation problem against the 1200-token cap (no-answer rate
+> matches GSM-Plus almost exactly, so longer MATH solutions are not being
+> clipped).
+>
+> Two findings that fell out of the screens for free:
+>
+> 1. **The format artifact shrinks monotonically with difficulty**
+>    (9.0 -> 6.7 -> 2.2 points). On easy problems the model often reasons
+>    correctly but phrases the answer loosely, so strict scoring punishes
+>    it; on hard problems it simply fails, and there is no
+>    correct-but-misformatted answer to lose. The artifact is largest
+>    exactly where the benchmark is most saturated - which is why it
+>    destroyed the GSM8K result specifically.
+> 2. **pass@64 is identical under both scorings on every dataset**
+>    (0.950 vs 0.950; 0.800 vs 0.800) while pass@1 differs. Across 64
+>    draws some sample is always well-formatted, so format compliance can
+>    only ever distort pass@1. Now confirmed on three datasets.
+>
+> Next run: Step 3 on MATH-500, condition T only, both checkpoints,
+> 50 problems x n=128 (~$3). Answers whether a real reasoning gain
+> appears when headroom exists. T only because D/E render the problem as
+> an image and MATH contains LaTeX, which render.py would draw as raw
+> source rather than typeset maths - the modality question belongs on
+> GSM8K.
+
 Phase 1b was written to defend Δ_text +0.0587 / Δ_pixel +0.0925 against
 reviewer objections. **At a workshop there is no rebuttal round**, so
 every objection has to be closed inside the paper.
