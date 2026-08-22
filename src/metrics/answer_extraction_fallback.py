@@ -100,8 +100,15 @@ _NOISE_RE = re.compile(r"^[\\\[\]\(\)\s`*_$]+$")
 def normalize_number(token: str) -> str:
     """
     Canonicalise an extracted number to the same form GSM8K ground truth
-    uses: no thousands separators, and an integral decimal rendered as an
-    integer ("75.00" -> "75") so it compares equal to the reference.
+    uses: no thousands separators, an integral decimal rendered as an
+    integer ("75.00" -> "75"), and trailing zeros dropped from a genuine
+    decimal ("54.40" -> "54.4").
+
+    The trailing-zero case was found by the manual validation pass
+    (2026-08-22): "54.40" and "54.4" are the same number, but comparing
+    them as strings scored the extractor wrong. That was a bug in the
+    COMPARISON, not in the extraction, and it inflated the measured error
+    rate.
     """
     s = token.replace(",", "").strip()
     if "." in s:
@@ -109,14 +116,53 @@ def normalize_number(token: str) -> str:
             f = float(s)
             if f == int(f):
                 return str(int(f))
+            return repr(f).rstrip("0").rstrip(".")
         except ValueError:
             return s
     return s
 
 
-def _last_number_in(text: str) -> str | None:
-    matches = _NUMBER_RE.findall(text)
-    return normalize_number(matches[-1]) if matches else None
+# Numbers that are part of a clock time ("1:00 PM", "5:00") must not be
+# read as answers. Found in validation: three completions ended
+# "...burning from 1:00 PM to 5:00 PM", where the last number on the line
+# is "00".
+_TIME_RE = re.compile(r"\d{1,2}:\d{2}")
+
+# Numbers that appear as the RESULT of a computation ("= 435", "= 8 cm").
+_EQUALS_RESULT_RE = re.compile(rf"=\s*\\?\$?\s*({_NUMBER})")
+
+
+def _numbers_outside_times(text: str) -> list[str]:
+    """All numbers in `text`, with clock-time components removed first."""
+    return _NUMBER_RE.findall(_TIME_RE.sub(" ", text))
+
+
+def _last_number_in(text: str, computed: set[str] | None = None) -> str | None:
+    """
+    Best final-answer number on one line.
+
+    Plain "last number on the line" fails on a TRAILING QUALIFIER, which
+    the manual validation showed is the dominant error mode:
+
+        "John is 435 miles from home at the end of those 4 hours."  -> 4
+        "Claire will eat 7 dozens of eggs in 4 weeks."              -> 4
+        "Mike scored a total of 9 points over the 40-minute period" -> 40
+
+    In every such case the true answer had appeared just above as the
+    result of a computation ("= 435 miles", "= 7", "= 9 points"), whereas
+    the qualifier had not. So when `computed` (numbers following an "=" in
+    the surrounding tail) is supplied, prefer the last number on the line
+    that is also a computed result, and fall back to positional order
+    only when none matches.
+    """
+    candidates = [normalize_number(t) for t in _numbers_outside_times(text)]
+    if not candidates:
+        return None
+    if computed:
+        matching = [c for c in candidates if c in computed]
+        if matching:
+            return matching[-1]
+    return candidates[-1]
 
 
 def extract_with_fallback(
@@ -169,16 +215,21 @@ def extract_with_fallback(
     if m:
         return normalize_number(m[-1]), "bold"
 
+    # Numbers that appeared as computation results anywhere in the tail,
+    # used to disambiguate a concluding sentence that also carries a
+    # trailing qualifier (see _last_number_in).
+    computed = {normalize_number(t) for t in _EQUALS_RESULT_RE.findall(tail)}
+
     # Last content-bearing line, scanning backwards past pure
     # LaTeX/markdown noise such as a lone "\]". Within a line, a
     # currency-marked number wins over mere position (see _CURRENCY_RE).
     for line in reversed(tail_lines):
         if _NOISE_RE.match(line):
             continue
-        money = _CURRENCY_RE.findall(line)
+        money = _CURRENCY_RE.findall(_TIME_RE.sub(" ", line))
         if money:
             return normalize_number(money[-1]), "currency"
-        value = _last_number_in(line)
+        value = _last_number_in(line, computed)
         if value is not None:
             return value, "last_line"
 

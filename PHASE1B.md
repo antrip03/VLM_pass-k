@@ -1,9 +1,52 @@
 # Phase 1b — Controls
 
-Phase 1 is complete: Δ_text +0.0587, Δ_pixel +0.0925, 467 steps, ~$31.
-Phase 1b defends those numbers against the objections a reviewer will
-actually raise. **At a workshop there is no rebuttal round**, so every
-objection has to be closed inside the paper.
+> ## 🔴 FINDING (2026-08-22): the Phase 1 result is a format-compliance artifact
+>
+> Step 0 was run on the real records. The measured Δ does not survive
+> format-agnostic scoring.
+>
+> | Condition | Strict scoring (Phase 1) | Format-agnostic scoring |
+> |---|---|---|
+> | **T** | +0.0587 [+0.041, +0.076] ✅ | **−0.0092** [−0.023, +0.003] ✗ |
+> | **D** | +0.0719 [+0.056, +0.089] ✅ | **+0.0002** [−0.013, +0.014] ✗ |
+> | **E** | +0.0925 [+0.070, +0.116] ✅ | **−0.0109** [−0.025, +0.004] ✗ |
+>
+> The sharpening signature goes with it: under fair scoring the
+> within-coverage density shift is −0.0099 / +0.0003 / −0.0110 with sign
+> tests p = 0.76 / 1.00 / 0.64. **No gain, no sharpening, no expansion.**
+>
+> **Cause.** `src/training/reward_fn.py` and evaluation share one
+> extractor, so RLVR rewarded correctness *and* `####` formatting jointly.
+> Base emits a readable answer 87% of the time, RL 96%. Commit `43279ab`
+> caught the decoration slice of this (+0.099 → +0.059); the larger slice
+> is completions with **no marker at all** — 95.6% of base's unparsed
+> condition-T completions — containing correct reasoning written plainly
+> ("Therefore, Janet makes **$18** every day...").
+>
+> **Validation** (`src/metrics/answer_extraction_fallback.py`):
+> - Manual review of 120 completions: precision 100% (54/54 per model)
+>   — but the extractor was *tuned on those labels*, so this is a
+>   training-set figure.
+> - Held-out marker-stripped recovery on 3,000 fresh completions per
+>   model: 87.4% (base) / 89.0% (RL). The residual error is symmetric and
+>   slightly favours RL, i.e. it works *against* the collapse.
+> - Base's unparsed completions score like its parsed ones; RL's score far
+>   worse — consistent with format compliance, not reasoning.
+>
+> **Still outstanding:** the 120 labels were produced by an LLM pass that
+> also authored the extractor, so they are not independent. A human
+> spot-check of ~20 (especially the ambiguous ones) is needed before
+> publication. Reproduce with `scripts/rescore_with_fallback.py`.
+>
+> **What this does to the plan below:** Steps 2–3 (ceiling) and 6
+> (paraphrase) now defend a result that no longer exists as stated. Step 4
+> (random-reward control) becomes *more* important, and should be run
+> under both scorings. The paper's likely reframing is in the closing
+> section.
+
+Phase 1b was written to defend Δ_text +0.0587 / Δ_pixel +0.0925 against
+reviewer objections. **At a workshop there is no rebuttal round**, so
+every objection has to be closed inside the paper.
 
 Nothing here retrains the main model. Everything reuses the existing
 checkpoints and records.
