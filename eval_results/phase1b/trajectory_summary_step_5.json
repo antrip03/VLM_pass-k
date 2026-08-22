@@ -1,0 +1,17 @@
+{
+  "label": "step_5",
+  "step": 5,
+  "n": 128,
+  "problems": 50,
+  "records": 6400,
+  "elapsed_min": 26.0,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "format_compliance_rate": 0.8661,
+  "pass_at_1": 0.607,
+  "pass_at_1_fallback": 0.7005,
+  "pass_at_8": 0.9305,
+  "pass_at_64": 0.9793,
+  "pass_at_64_fallback": 0.9794,
+  "no_answer_rate": 0.1339,
+  "out_path": "/results/trajectory_records_step_5.parquet"
+}

@@ -1,0 +1,17 @@
+{
+  "label": "step_150",
+  "step": 150,
+  "n": 128,
+  "problems": 50,
+  "records": 6400,
+  "elapsed_min": 25.2,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "format_compliance_rate": 0.9127,
+  "pass_at_1": 0.6352,
+  "pass_at_1_fallback": 0.6958,
+  "pass_at_8": 0.9363,
+  "pass_at_64": 0.9798,
+  "pass_at_64_fallback": 0.9799,
+  "no_answer_rate": 0.0873,
+  "out_path": "/results/trajectory_records_step_150.parquet"
+}

@@ -1,0 +1,17 @@
+{
+  "label": "step_467",
+  "step": 467,
+  "n": 128,
+  "problems": 50,
+  "records": 6400,
+  "elapsed_min": 26.5,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "format_compliance_rate": 0.9664,
+  "pass_at_1": 0.6683,
+  "pass_at_1_fallback": 0.6887,
+  "pass_at_8": 0.9365,
+  "pass_at_64": 0.9948,
+  "pass_at_64_fallback": 0.9949,
+  "no_answer_rate": 0.0336,
+  "out_path": "/results/trajectory_records_step_467.parquet"
+}

@@ -1,0 +1,17 @@
+{
+  "label": "step_300",
+  "step": 300,
+  "n": 128,
+  "problems": 50,
+  "records": 6400,
+  "elapsed_min": 25.5,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "format_compliance_rate": 0.9483,
+  "pass_at_1": 0.6558,
+  "pass_at_1_fallback": 0.6855,
+  "pass_at_8": 0.9359,
+  "pass_at_64": 0.9798,
+  "pass_at_64_fallback": 0.9799,
+  "no_answer_rate": 0.0517,
+  "out_path": "/results/trajectory_records_step_300.parquet"
+}

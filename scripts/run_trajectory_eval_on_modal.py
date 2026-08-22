@@ -263,20 +263,37 @@ def analyze_trajectory(labels: str) -> dict:
         # arbitrary absolute threshold: growth smaller than the noise on
         # a single point is not growth.
         noise = (first["ci_fallback"][1] - first["ci_fallback"][0]) / 2
+        # Compliance growth is reported alongside, because the whole point
+        # of this run is the CONTRAST between the two curves: if compliance
+        # climbs while format-agnostic reasoning does not, the strict
+        # metric was tracking formatting.
+        comp_first = first.get("format_compliance_rate")
+        comp_last = last.get("format_compliance_rate")
+        comp_growth = (
+            comp_last - comp_first if comp_first is not None and comp_last is not None else None
+        )
+        comp_note = (
+            f" Meanwhile format compliance moved {comp_first:.4f} -> {comp_last:.4f} "
+            f"({comp_growth:+.4f})."
+            if comp_growth is not None
+            else ""
+        )
+
         if growth <= noise:
             verdict = (
-                f"FLAT: Delta_text at step {last['step']} ({last['delta_text']}) is within "
-                f"noise of step {first['step']} ({first['delta_text']}). This matches the "
-                f"fast-plateau signature of spurious rewards and is a warning sign - the "
-                f"randomised-reward control becomes essential, not optional."
+                f"FLAT (format-agnostic): Delta_text at step {last['step']} "
+                f"({last['delta_text_fallback']:+.4f}) is within noise of step {first['step']} "
+                f"({first['delta_text_fallback']:+.4f}), noise={noise:.4f}.{comp_note} "
+                f"A flat reasoning curve alongside a rising compliance curve is the "
+                f"format-compliance signature: the strict metric was tracking formatting."
             )
         else:
             verdict = (
-                f"CLIMBING: Delta_text grows {growth:+.4f} from step {first['step']} to "
-                f"{last['step']}, beyond single-point noise ({noise:.4f}). Consistent with a "
-                f"reward signal carrying real information - but NOT conclusive: Shao et al. "
-                f"note random rewards also converge slowly (>100 steps on small models), so "
-                f"this does not replace the randomised-reward control."
+                f"CLIMBING (format-agnostic): Delta_text grows {growth:+.4f} from step "
+                f"{first['step']} to {last['step']}, beyond single-point noise "
+                f"({noise:.4f}).{comp_note} A real reasoning gain - but NOT conclusive that "
+                f"the reward signal carried information: Shao et al. note random rewards also "
+                f"converge slowly (>100 steps on small models)."
             )
 
     out = {"base_pass_at_1_strict": summaries["base"]["pass_at_1"],

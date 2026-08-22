@@ -1,0 +1,17 @@
+{
+  "label": "base",
+  "step": null,
+  "n": 128,
+  "problems": 50,
+  "records": 6400,
+  "elapsed_min": 22.6,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "format_compliance_rate": 0.8628,
+  "pass_at_1": 0.6128,
+  "pass_at_1_fallback": 0.7072,
+  "pass_at_8": 0.9266,
+  "pass_at_64": 0.9883,
+  "pass_at_64_fallback": 0.9892,
+  "no_answer_rate": 0.1372,
+  "out_path": "/results/trajectory_records_base.parquet"
+}
