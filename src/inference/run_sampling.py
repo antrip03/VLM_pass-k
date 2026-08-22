@@ -22,6 +22,7 @@ import pandas as pd
 
 from src.data.gsm8k_loader import GSM8KExample
 from src.inference.sampler import CONDITION_SAMPLERS
+from src.metrics.answer_extraction_fallback import is_correct_with_fallback
 
 
 @dataclass
@@ -35,6 +36,20 @@ class SamplingRecord:
     extracted_answer: str | None
     transcription: str | None
     correct: bool
+    # DUAL SCORING, added 2026-08-22 after the Phase 1 records showed that
+    # `correct` above (strict "#### N" extraction) conflates reasoning with
+    # output formatting. Base emitted a readable answer 87% of the time on
+    # condition T, RL 96%, and that 9-point gap alone accounted for the
+    # entire measured Delta. Because the SAME extractor computed the
+    # training reward, RL was paid for formatting and took it.
+    #
+    # Every future run therefore records BOTH scorings at generation time,
+    # so no analysis can silently inherit only the strict one, and no
+    # rescoring pass is needed to get the format-agnostic number.
+    # `correct` is kept unchanged - it is what training optimised, and the
+    # DIFFERENCE between the two columns is the quantity of interest.
+    correct_fallback: bool = False
+    extraction_method: str = "unknown"
 
 
 def run_sampling(
@@ -85,6 +100,9 @@ def run_sampling(
             kwargs = {k: v for k, v in sampler_kwargs.items() if k in accepted}
             samples = sampler_fn(model, processor, problem.question, n=n, **kwargs)
             for sample_idx, sample in enumerate(samples):
+                fb_correct, fb_method = is_correct_with_fallback(
+                    sample.completion, problem.final_answer
+                )
                 records.append(
                     SamplingRecord(
                         problem_idx=problem.idx,
@@ -96,6 +114,8 @@ def run_sampling(
                         extracted_answer=sample.extracted_answer,
                         transcription=sample.transcription,
                         correct=(sample.extracted_answer == problem.final_answer),
+                        correct_fallback=fb_correct,
+                        extraction_method=fb_method,
                     )
                 )
 
@@ -103,13 +123,15 @@ def run_sampling(
         per_problem = elapsed / problem_no
         remaining = (total - problem_no) * per_problem
         correct_so_far = sum(1 for r in records if r.correct)
+        fb_so_far = sum(1 for r in records if r.correct_fallback)
         tag = f"{progress_label} " if progress_label else ""
         print(
             f"[eval] {tag}problem {problem_no}/{total}"
             f" | elapsed {_hms(elapsed)}"
             f" | {per_problem:.0f}s/problem"
             f" | ETA {_hms(remaining)}"
-            f" | running acc {correct_so_far / max(len(records), 1):.3f}",
+            f" | acc strict {correct_so_far / max(len(records), 1):.3f}"
+            f" / fallback {fb_so_far / max(len(records), 1):.3f}",
             flush=True,
         )
     return records

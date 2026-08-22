@@ -133,18 +133,28 @@ def eval_variant(
 
     per_cond = {}
     for cond in conditions:
-        by_problem: dict[int, list[bool]] = {}
-        for r in records:
-            if r.condition == cond:
-                by_problem.setdefault(r.problem_idx, []).append(r.correct)
-        pp = [(len(v), sum(v)) for _, v in sorted(by_problem.items())]
         sub = [r for r in records if r.condition == cond]
+
+        def _pp(attr: str):
+            acc: dict[int, list[bool]] = {}
+            for r in sub:
+                acc.setdefault(r.problem_idx, []).append(getattr(r, attr))
+            return [(len(v), sum(v)) for _, v in sorted(acc.items())]
+
+        pp, pp_fb = _pp("correct"), _pp("correct_fallback")
         per_cond[cond] = {
+            # Strict = what training optimised. Fallback = format-agnostic.
+            # Both are reported because the DIFFERENCE is the finding.
             "pass_at_1": round(mean_pass_at_k(pp, 1), 4),
+            "pass_at_1_fallback": round(mean_pass_at_k(pp_fb, 1), 4),
             "pass_at_8": round(mean_pass_at_k(pp, 8), 4) if n >= 8 else None,
             "pass_at_64": round(mean_pass_at_k(pp, 64), 4) if n >= 64 else None,
+            "pass_at_64_fallback": round(mean_pass_at_k(pp_fb, 64), 4) if n >= 64 else None,
             "no_answer_rate": round(
                 sum(1 for r in sub if r.extracted_answer is None) / max(len(sub), 1), 4
+            ),
+            "format_compliance_rate": round(
+                sum(1 for r in sub if r.extracted_answer is not None) / max(len(sub), 1), 4
             ),
         }
 
@@ -193,27 +203,40 @@ def analyze_variant(tag: str, conditions: str = "T,D,E") -> dict:
         df["model_kind"] = kind
         dfs[kind] = df
 
-    def per_problem(df, condition):
-        g = df[df["condition"] == condition].groupby("problem_idx")["correct"]
+    def per_problem(df, condition, col="correct"):
+        g = df[df["condition"] == condition].groupby("problem_idx")[col]
         return [(int(c), int(s)) for c, s in zip(g.count(), g.sum())]
 
+    # Every quantity is computed under BOTH scoring rules. "strict" is the
+    # rule training optimised (and which conflates formatting with
+    # reasoning); "fallback" is format-agnostic. Reporting only one would
+    # reproduce the Phase 1 error in either direction.
     out = {"tag": tag, "pass_at_k": {}, "deltas": {}}
-    for condition in conditions:
-        for k in (1, 8, 64):
-            for kind in ("base", "rl"):
-                res = bootstrap_pass_at_k_ci(per_problem(dfs[kind], condition), k=k)
-                out["pass_at_k"][f"{kind}/{condition}/k={k}"] = {
-                    "mean": round(res["point_estimate"], 4),
-                    "ci": [round(res["ci_lower"], 4), round(res["ci_upper"], 4)],
-                }
-            d = bootstrap_delta_ci(
-                per_problem(dfs["rl"], condition), per_problem(dfs["base"], condition), k=k
+    for scoring, col in (("strict", "correct"), ("fallback", "correct_fallback")):
+        if col not in dfs["base"].columns:
+            out.setdefault("warnings", []).append(
+                f"column {col!r} absent - records predate dual scoring; "
+                f"run scripts/rescore_with_fallback.py to add it"
             )
-            out["deltas"][f"Delta_{condition}/k={k}"] = {
-                "delta": round(d["point_estimate"], 4),
-                "ci": [round(d["ci_lower"], 4), round(d["ci_upper"], 4)],
-                "significant": d["significant"],
-            }
+            continue
+        for condition in conditions:
+            for k in (1, 8, 64):
+                for kind in ("base", "rl"):
+                    res = bootstrap_pass_at_k_ci(per_problem(dfs[kind], condition, col), k=k)
+                    out["pass_at_k"][f"{scoring}/{kind}/{condition}/k={k}"] = {
+                        "mean": round(res["point_estimate"], 4),
+                        "ci": [round(res["ci_lower"], 4), round(res["ci_upper"], 4)],
+                    }
+                d = bootstrap_delta_ci(
+                    per_problem(dfs["rl"], condition, col),
+                    per_problem(dfs["base"], condition, col),
+                    k=k,
+                )
+                out["deltas"][f"{scoring}/Delta_{condition}/k={k}"] = {
+                    "delta": round(d["point_estimate"], 4),
+                    "ci": [round(d["ci_lower"], 4), round(d["ci_upper"], 4)],
+                    "significant": d["significant"],
+                }
 
     # THE question this whole step exists to answer.
     import pandas as pd
@@ -223,7 +246,10 @@ def analyze_variant(tag: str, conditions: str = "T,D,E") -> dict:
 
     verdicts = {}
     for condition in conditions:
-        base64 = out["pass_at_k"][f"base/{condition}/k=64"]["mean"]
+        key = f"fallback/base/{condition}/k=64"
+        if key not in out["pass_at_k"]:
+            key = f"strict/base/{condition}/k=64"
+        base64 = out["pass_at_k"][key]["mean"]
         if base64 >= 0.95:
             verdicts[condition] = (
                 f"STILL SATURATED: base pass@64 = {base64:.4f}. This set does not fix the "

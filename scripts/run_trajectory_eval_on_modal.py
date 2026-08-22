@@ -121,10 +121,20 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
 
     # (n, c) per problem, ordered by problem_idx so every checkpoint's
     # list is aligned with every other's for later paired comparisons.
-    by_problem: dict[int, list[bool]] = {}
-    for r in records:
-        by_problem.setdefault(r.problem_idx, []).append(r.correct)
-    per_problem = [(len(v), sum(v)) for _, v in sorted(by_problem.items())]
+    def _per_problem(attr: str):
+        acc: dict[int, list[bool]] = {}
+        for r in records:
+            acc.setdefault(r.problem_idx, []).append(getattr(r, attr))
+        return [(len(v), sum(v)) for _, v in sorted(acc.items())]
+
+    per_problem = _per_problem("correct")
+    per_problem_fb = _per_problem("correct_fallback")
+
+    # FORMAT COMPLIANCE is now a headline quantity, not a diagnostic: the
+    # Phase 1 finding is that RL's apparent gain WAS this. Tracking it per
+    # checkpoint turns the mechanism into a directly plottable curve
+    # against the reasoning curve.
+    compliance = sum(1 for r in records if r.extracted_answer is not None) / max(len(records), 1)
 
     summary = {
         "label": label,
@@ -134,9 +144,12 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
         "records": len(records),
         "elapsed_min": round((time.time() - t0) / 60, 1),
         "vision_sha256": vision_sha,
+        "format_compliance_rate": round(compliance, 4),
         "pass_at_1": round(mean_pass_at_k(per_problem, 1), 4),
+        "pass_at_1_fallback": round(mean_pass_at_k(per_problem_fb, 1), 4),
         "pass_at_8": round(mean_pass_at_k(per_problem, 8), 4) if n >= 8 else None,
         "pass_at_64": round(mean_pass_at_k(per_problem, 64), 4) if n >= 64 else None,
+        "pass_at_64_fallback": round(mean_pass_at_k(per_problem_fb, 64), 4) if n >= 64 else None,
         "no_answer_rate": round(
             sum(1 for r in records if r.extracted_answer is None) / max(len(records), 1), 4
         ),
@@ -172,9 +185,9 @@ def analyze_trajectory(labels: str) -> dict:
     if "base" not in labels:
         raise ValueError("labels must include 'base' - it is the reference for every Delta")
 
-    def per_problem(label: str):
+    def per_problem(label: str, col: str = "correct"):
         df = load_sampling_records(f"{RESULTS_DIR}/trajectory_records_{label}.parquet")
-        g = df[df["condition"] == "T"].groupby("problem_idx")["correct"]
+        g = df[df["condition"] == "T"].groupby("problem_idx")[col]
         return [(int(c), int(s)) for c, s in zip(g.count(), g.sum())]
 
     summaries = {}
@@ -183,19 +196,29 @@ def analyze_trajectory(labels: str) -> dict:
             summaries[label] = json.load(f)
 
     base_pp = per_problem("base")
+    base_pp_fb = per_problem("base", "correct_fallback")
     trajectory = []
     for label in labels:
         if label == "base":
             continue
         d = bootstrap_delta_ci(per_problem(label), base_pp, k=1)
+        d_fb = bootstrap_delta_ci(per_problem(label, "correct_fallback"), base_pp_fb, k=1)
         trajectory.append(
             {
                 "label": label,
                 "step": summaries[label]["step"],
-                "pass_at_1": summaries[label]["pass_at_1"],
-                "delta_text": round(d["point_estimate"], 4),
-                "ci": [round(d["ci_lower"], 4), round(d["ci_upper"], 4)],
-                "significant": d["significant"],
+                # The two curves whose DIVERGENCE is the mechanism: format
+                # compliance should climb steeply while format-agnostic
+                # reasoning stays flat, if the Phase 1 diagnosis is right.
+                "format_compliance_rate": summaries[label].get("format_compliance_rate"),
+                "pass_at_1_strict": summaries[label]["pass_at_1"],
+                "pass_at_1_fallback": summaries[label].get("pass_at_1_fallback"),
+                "delta_text_strict": round(d["point_estimate"], 4),
+                "ci_strict": [round(d["ci_lower"], 4), round(d["ci_upper"], 4)],
+                "significant_strict": d["significant"],
+                "delta_text_fallback": round(d_fb["point_estimate"], 4),
+                "ci_fallback": [round(d_fb["ci_lower"], 4), round(d_fb["ci_upper"], 4)],
+                "significant_fallback": d_fb["significant"],
             }
         )
     trajectory.sort(key=lambda r: r["step"])
@@ -203,11 +226,11 @@ def analyze_trajectory(labels: str) -> dict:
     verdict = None
     if len(trajectory) >= 2:
         first, last = trajectory[0], trajectory[-1]
-        growth = last["delta_text"] - first["delta_text"]
+        growth = last["delta_text_fallback"] - first["delta_text_fallback"]
         # "Plateau" is defined against the CI width rather than an
         # arbitrary absolute threshold: growth smaller than the noise on
         # a single point is not growth.
-        noise = (first["ci"][1] - first["ci"][0]) / 2
+        noise = (first["ci_fallback"][1] - first["ci_fallback"][0]) / 2
         if growth <= noise:
             verdict = (
                 f"FLAT: Delta_text at step {last['step']} ({last['delta_text']}) is within "
@@ -224,7 +247,8 @@ def analyze_trajectory(labels: str) -> dict:
                 f"this does not replace the randomised-reward control."
             )
 
-    out = {"base_pass_at_1": summaries["base"]["pass_at_1"], "trajectory": trajectory,
+    out = {"base_pass_at_1_strict": summaries["base"]["pass_at_1"],
+           "base_pass_at_1_fallback": summaries["base"].get("pass_at_1_fallback"), "trajectory": trajectory,
            "verdict": verdict}
     with open(f"{RESULTS_DIR}/trajectory_analysis.json", "w") as f:
         json.dump(out, f, indent=2)

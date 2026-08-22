@@ -254,12 +254,21 @@ def eval_control_model(which: str, n: int, problems: int, conditions: list[str],
 
     per_cond = {}
     for cond in conditions:
-        by_problem: dict[int, list[bool]] = {}
-        for r in records:
-            if r.condition == cond:
-                by_problem.setdefault(r.problem_idx, []).append(r.correct)
-        pp = [(len(v), sum(v)) for _, v in sorted(by_problem.items())]
-        per_cond[cond] = {"pass_at_1": round(mean_pass_at_k(pp, 1), 4)}
+        sub = [r for r in records if r.condition == cond]
+
+        def _pp(attr: str):
+            acc: dict[int, list[bool]] = {}
+            for r in sub:
+                acc.setdefault(r.problem_idx, []).append(getattr(r, attr))
+            return [(len(v), sum(v)) for _, v in sorted(acc.items())]
+
+        per_cond[cond] = {
+            "pass_at_1": round(mean_pass_at_k(_pp("correct"), 1), 4),
+            "pass_at_1_fallback": round(mean_pass_at_k(_pp("correct_fallback"), 1), 4),
+            "format_compliance_rate": round(
+                sum(1 for r in sub if r.extracted_answer is not None) / max(len(sub), 1), 4
+            ),
+        }
 
     summary = {
         "which": which, "n": n, "problems": len(examples), "conditions": conditions,
@@ -292,16 +301,25 @@ def analyze_control(conditions: str = "T,E") -> dict:
     conditions = [c.strip() for c in conditions.replace(",", " ").split()
                   if c.strip() in ("T", "D", "E")] or EVAL_CONDITIONS
 
-    def per_problem(which: str, condition: str):
+    def per_problem(which: str, condition: str, col: str = "correct"):
         df = load_sampling_records(f"{RESULTS_DIR}/control_records_{which}.parquet")
-        g = df[df["condition"] == condition].groupby("problem_idx")["correct"]
+        g = df[df["condition"] == condition].groupby("problem_idx")[col]
         return [(int(c), int(s)) for c, s in zip(g.count(), g.sum())]
 
     out = {"step": CONTROL_STEP, "per_condition": {}}
     for condition in conditions:
-        base = per_problem("base", condition)
-        real = bootstrap_delta_ci(per_problem("real250", condition), base, k=1)
-        rand = bootstrap_delta_ci(per_problem("random250", condition), base, k=1)
+        # Scored format-agnostically. Under strict scoring BOTH runs would
+        # show a "gain" that is largely format compliance - and the random
+        # reward can teach formatting just as well as the real one, since
+        # a Bernoulli(0.5) reward still rewards half of all well-formatted
+        # answers. Only the fallback column isolates reasoning.
+        col = "correct_fallback"
+        base = per_problem("base", condition, col)
+        real = bootstrap_delta_ci(per_problem("real250", condition, col), base, k=1)
+        rand = bootstrap_delta_ci(per_problem("random250", condition, col), base, k=1)
+        base_s = per_problem("base", condition)
+        real_s = bootstrap_delta_ci(per_problem("real250", condition), base_s, k=1)
+        rand_s = bootstrap_delta_ci(per_problem("random250", condition), base_s, k=1)
 
         d_real, d_rand = real["point_estimate"], rand["point_estimate"]
         ratio = (d_rand / d_real) if abs(d_real) > 1e-9 else None
@@ -343,6 +361,15 @@ def analyze_control(conditions: str = "T,E") -> dict:
                 "significant": rand["significant"],
             },
             "random_share_of_real_gain": round(ratio, 4) if ratio is not None else None,
+            "strict_scoring_for_reference": {
+                "delta_real": round(real_s["point_estimate"], 4),
+                "delta_random": round(rand_s["point_estimate"], 4),
+                "note": (
+                    "Strict scoring conflates formatting with reasoning. If BOTH the real and "
+                    "the random reward show a strict gain, that is direct evidence the gain is "
+                    "format compliance - a meaningless reward cannot teach reasoning."
+                ),
+            },
             "verdict": verdict,
         }
 
