@@ -54,6 +54,53 @@ Condition T, stated as plainly as possible:
 The base model recovered **435 more** generations than RL did. That
 single asymmetry is the entire reported result.
 
+## 1c. The D/E result — the actual contribution
+
+The novel claim had three parts. All three dissolve under format-agnostic
+scoring:
+
+| Claim | Strict | Format-agnostic |
+|---|---|---|
+| Gain survives modality shift (Delta_E > 0) | +0.0925 ✅ | **-0.0109** ✗ |
+| Gain is LARGEST on images (Delta_E > Delta_T) | +0.034 ✅ | **-0.001** ✗ |
+| Ordering is not a floor effect | survives 4/4 bins | **collapses, 2/4 bins, gap -0.0003** |
+
+**Mechanism, and it is modality-specific.** Base-model format compliance
+by condition:
+
+| cond | base compliance | RL compliance | gap | base rescued | RL rescued | asymmetry |
+|---|---|---|---|---|---|---|
+| T | 0.866 | 0.959 | +0.093 | 574 | 139 | +435 |
+| D | 0.866 | 0.962 | +0.096 | 606 | 147 | +459 |
+| **E** | **0.790** | **0.935** | **+0.145** | **888** | **226** | **+662** |
+
+The base model follows the output-format instruction ~8 points LESS
+reliably when reading a problem from an image than from text - the
+instruction is textual, the content is visual, and it lapses into prose.
+So the strict extractor penalises it hardest in condition E.
+
+The reported Delta ordering (E +0.093 > D +0.072 > T +0.059) is the
+COMPLIANCE-GAP ordering (E +0.145 > D +0.096 > T +0.093), not a
+reasoning-transfer ordering.
+
+**So the contribution is not "the gain survives modality shift" but:**
+
+> Cross-modal transfer of an RLVR gain can be entirely manufactured by an
+> answer-extractor. The apparent transfer is strongest precisely where the
+> measurement is weakest, because reading from an image degrades
+> instruction-following, and a format-coupled scorer converts that into
+> apparent reasoning capability.
+
+This is specific to VLM evaluation - the mechanism requires a modality
+that degrades instruction-following, so it cannot appear in the text-only
+RLVR literature. It is only visible because of the T/D/E design.
+
+CORRECTION TO AN EARLIER RESULT IN THIS FILE'S HISTORY: the
+difficulty-matched control was first run on the strict column and
+reported "ORDERING SURVIVES (+0.0409, 4/4 bins)". That was confirming an
+artifact. On `correct_fallback` the gap is -0.0003 with bins splitting
+2/4.
+
 ## 2. The mechanism, across training
 
 GSM8K, condition T, 50 problems × n=128, six checkpoints.
