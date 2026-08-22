@@ -313,12 +313,11 @@ def main(
     if mode not in ("screen", "full"):
         raise SystemExit("--mode must be 'screen' or 'full'")
 
-    hf_token = os.environ.get("HF_TOKEN")
-    if mode == "full" and not hf_token:
-        raise SystemExit(
-            "HF_TOKEN is required for --mode full (the RL checkpoint lives on the HF Hub).\n"
-            "  echo 'HF_TOKEN=hf_...' > .env && set -a && source .env && set +a"
-        )
+    # No token required: GunGG4/grpo-vlm-phase1-checkpoints is public
+    # (verified 2026-08-22, HfApi.repo_info -> private=False; anonymous
+    # get_hf_file_metadata returns the 7630 MB checkpoint fine). Honoured
+    # if present, purely to raise Hub rate limits.
+    hf_token = os.environ.get("HF_TOKEN", "")
 
     if mode == "screen":
         # Base model only: the screen asks a question about the DATASET

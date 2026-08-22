@@ -293,13 +293,9 @@ def analyze_trajectory(labels: str) -> dict:
 def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool = True):
     import os
 
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise SystemExit(
-            "HF_TOKEN is required (checkpoints live on the HF Hub mirror).\n"
-            "  echo 'HF_TOKEN=hf_...' > .env   # .env is git-ignored\n"
-            "  set -a; source .env; set +a"
-        )
+    # No token required - the checkpoint repo is public (verified
+    # 2026-08-22). Honoured if present, to raise Hub rate limits.
+    hf_token = os.environ.get("HF_TOKEN", "")
 
     step_list = [int(s) for s in steps.split(",") if s.strip()] if steps else list(DEFAULT_STEPS)
     available = _available_steps()
