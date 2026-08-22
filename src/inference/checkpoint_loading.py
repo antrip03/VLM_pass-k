@@ -187,7 +187,10 @@ def download_checkpoint(
     return hf_hub_download(
         repo_id=repo_id,
         filename=filename_template.format(step=step),
-        token=hf_token,
+        # Empty string is NOT a valid token - normalise to None so the
+        # anonymous path is used for this public repo. Passing "" makes
+        # huggingface_hub attempt (and fail) an authenticated request.
+        token=hf_token or None,
         cache_dir=cache_dir,
     )
 
@@ -253,9 +256,16 @@ def load_model_at_step(
             if verbose:
                 print(f"loading global_step_{step} from local volume {path}", flush=True)
         else:
-            if not repo_id or not hf_token:
+            # A token is NOT required: GunGG4/grpo-vlm-phase1-checkpoints is
+            # public (verified 2026-08-22 via HfApi.repo_info -> private=False).
+            # The earlier `not hf_token` check raised AFTER the base model had
+            # already been loaded onto a paid GPU, so a public-repo run would
+            # have burned the container before failing. Only repo_id is
+            # genuinely required; the token is passed through when present to
+            # raise Hub rate limits.
+            if not repo_id:
                 raise ValueError(
-                    "Provide either local_checkpoint_dir, or repo_id + hf_token, "
+                    "Provide either local_checkpoint_dir, or repo_id, "
                     "to load a trained checkpoint."
                 )
             if verbose:
