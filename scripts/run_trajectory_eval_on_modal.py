@@ -38,6 +38,24 @@ CONDITION T ONLY - deliberately. The quantity under challenge is
 Delta_text; D and E cost far more per checkpoint (image conditions) and
 add nothing to the shape question.
 
+
+LAUNCHING - READ THIS FIRST
+---------------------------
+`modal run` STOPS the app as soon as the local entrypoint returns, which
+kills anything launched with .spawn() and never awaited. That was
+observed live (2026-08-22): a screen run spawned cleanly, printed "safe
+to disconnect", and the app terminated seconds later with an empty
+results volume. The existing scripts/trigger_*.py exist precisely because
+of this - they target an already-`modal deploy`ed app, which is not tied
+to any local process.
+
+These entrypoints therefore BLOCK on their results. For a short run that
+is all you need. For a multi-hour run, launch with:
+
+    modal run --detach scripts/<this file> ...
+
+which keeps the app alive if the local connection drops.
+
     modal run scripts/run_trajectory_eval_on_modal.py
     modal run scripts/run_trajectory_eval_on_modal.py --steps 25,100,200,467 --n 128
 
@@ -63,15 +81,29 @@ results_volume = modal.Volume.from_name("grpo-vlm-phase1b-results", create_if_mi
 HF_CKPT_REPO = "GunGG4/grpo-vlm-phase1-checkpoints"
 EVAL_GPU = "A10G"
 
-# Default sweep. 25 is the earliest checkpoint (the fast-plateau window
-# Shao et al. describe); 467 is the final model whose Delta_text=+0.0587
-# is the number being defended. Every value must be a real saved
-# checkpoint: save_freq=25, so multiples of 25 up to 450, plus 467.
-DEFAULT_STEPS = (25, 100, 200, 467)
+# Default sweep, chosen against the checkpoints that ACTUALLY exist on
+# the Hub (verified 2026-08-22): 5, 75, 100, 125, ... 450, 467. Note that
+# steps 25 and 50 are NOT present despite save_freq=25 - assuming the
+# nominal schedule would have failed at download time. _available_steps()
+# below queries the repo rather than trusting the schedule.
+#
+# 5 is the earliest point, which is where it matters most: if format
+# compliance jumps almost immediately while format-agnostic accuracy does
+# not, the mechanism is visible in the first few steps.
+DEFAULT_STEPS = (5, 75, 150, 300, 467)
 
 
-def _valid_step(step: int) -> bool:
-    return step == 467 or (step % 25 == 0 and 25 <= step <= 450)
+def _available_steps() -> list[int]:
+    """Steps that have the loader's actor .pt file on the Hub."""
+    from huggingface_hub import HfApi
+
+    info = HfApi().repo_info(HF_CKPT_REPO, repo_type="model")
+    steps = {
+        int(f.rfilename.split("/")[0].split("_")[-1])
+        for f in info.siblings
+        if f.rfilename.endswith("model_world_size_1_rank_0.pt")
+    }
+    return sorted(steps)
 
 
 @app.function(
@@ -270,12 +302,14 @@ def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool =
         )
 
     step_list = [int(s) for s in steps.split(",") if s.strip()] if steps else list(DEFAULT_STEPS)
-    bad = [s for s in step_list if not _valid_step(s)]
+    available = _available_steps()
+    bad = [s for s in step_list if s not in available]
     if bad:
         raise SystemExit(
-            f"Steps {bad} are not saved checkpoints. save_freq=25 over 467 total steps, so "
-            f"valid values are multiples of 25 from 25 to 450, plus 467."
+            f"Steps {bad} have no checkpoint on {HF_CKPT_REPO}. "
+            f"Available: {available}"
         )
+    print(f"Checkpoints available on the Hub: {available}")
 
     fn = eval_checkpoint_text_only.with_options(
         secrets=[modal.Secret.from_dict({"HF_TOKEN": hf_token})]

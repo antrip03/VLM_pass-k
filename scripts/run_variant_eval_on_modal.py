@@ -37,6 +37,24 @@ It does not need the originals re-run: Phase 1 already measured them on
 exactly these problems. Only the rephrased variants are generated here,
 and the comparison is made against the existing records.
 
+
+LAUNCHING - READ THIS FIRST
+---------------------------
+`modal run` STOPS the app as soon as the local entrypoint returns, which
+kills anything launched with .spawn() and never awaited. That was
+observed live (2026-08-22): a screen run spawned cleanly, printed "safe
+to disconnect", and the app terminated seconds later with an empty
+results volume. The existing scripts/trigger_*.py exist precisely because
+of this - they target an already-`modal deploy`ed app, which is not tied
+to any local process.
+
+These entrypoints therefore BLOCK on their results. For a short run that
+is all you need. For a multi-hour run, launch with:
+
+    modal run --detach scripts/<this file> ...
+
+which keeps the app alive if the local connection drops.
+
     modal run scripts/run_variant_eval_on_modal.py --dataset gsmplus_harder --mode screen
     modal run scripts/run_variant_eval_on_modal.py --dataset gsmplus_harder --mode full
     modal run scripts/run_variant_eval_on_modal.py --dataset gsmplus_rephrased --mode full --conditions T

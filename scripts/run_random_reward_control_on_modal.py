@@ -51,6 +51,24 @@ Affordable because the control needs pass@1, not pass@k: n=16 suffices
 where the headline used n=128, an 8x reduction on the expensive
 condition.
 
+
+LAUNCHING - READ THIS FIRST
+---------------------------
+`modal run` STOPS the app as soon as the local entrypoint returns, which
+kills anything launched with .spawn() and never awaited. That was
+observed live (2026-08-22): a screen run spawned cleanly, printed "safe
+to disconnect", and the app terminated seconds later with an empty
+results volume. The existing scripts/trigger_*.py exist precisely because
+of this - they target an already-`modal deploy`ed app, which is not tied
+to any local process.
+
+These entrypoints therefore BLOCK on their results. For a short run that
+is all you need. For a multi-hour run, launch with:
+
+    modal run --detach scripts/<this file> ...
+
+which keeps the app alive if the local connection drops.
+
     # 1. train (~3.5-4hr on A100-40GB at the measured ~55s/step)
     modal run scripts/run_random_reward_control_on_modal.py::train_random_reward
 
@@ -385,11 +403,8 @@ def evaluate(n: int = EVAL_N, problems: int = EVAL_PROBLEMS, conditions: str = "
              image_chunk: int = 32):
     import os
 
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise SystemExit(
-            "HF_TOKEN is required - the REAL run's step-250 checkpoint lives on the HF Hub."
-        )
+    # Checkpoint repo verified PUBLIC 2026-08-22 - no token required.
+    hf_token = os.environ.get("HF_TOKEN", "")
     cond_list = [c for c in conditions if c in ("T", "D", "E")]
     fn = eval_control_model.with_options(secrets=[modal.Secret.from_dict({"HF_TOKEN": hf_token})])
 
