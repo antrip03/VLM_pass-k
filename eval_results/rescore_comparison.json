@@ -1,0 +1,91 @@
+{
+  "per_condition": {
+    "T": {
+      "strict": {
+        "base_pass_at_1": 0.6089,
+        "rl_pass_at_1": 0.6677,
+        "delta": 0.0587,
+        "ci": [
+          0.0406,
+          0.0763
+        ],
+        "significant": true
+      },
+      "fallback": {
+        "base_pass_at_1": 0.6966,
+        "rl_pass_at_1": 0.6884,
+        "delta": -0.0081,
+        "ci": [
+          -0.0212,
+          0.0042
+        ],
+        "significant": false
+      },
+      "format_component": 0.0668
+    },
+    "D": {
+      "strict": {
+        "base_pass_at_1": 0.6031,
+        "rl_pass_at_1": 0.675,
+        "delta": 0.0719,
+        "ci": [
+          0.0558,
+          0.0889
+        ],
+        "significant": true
+      },
+      "fallback": {
+        "base_pass_at_1": 0.6956,
+        "rl_pass_at_1": 0.6975,
+        "delta": 0.0019,
+        "ci": [
+          -0.0109,
+          0.015
+        ],
+        "significant": false
+      },
+      "format_component": 0.07
+    },
+    "E": {
+      "strict": {
+        "base_pass_at_1": 0.4961,
+        "rl_pass_at_1": 0.5886,
+        "delta": 0.0925,
+        "ci": [
+          0.0695,
+          0.1161
+        ],
+        "significant": true
+      },
+      "fallback": {
+        "base_pass_at_1": 0.6295,
+        "rl_pass_at_1": 0.6234,
+        "delta": -0.0061,
+        "ci": [
+          -0.0209,
+          0.0092
+        ],
+        "significant": false
+      },
+      "format_component": 0.0986
+    }
+  },
+  "extraction_methods": {
+    "base": {
+      "last_line": 1325,
+      "bold": 735,
+      "answer_marker": 543,
+      "currency": 414,
+      "none": 26,
+      "code_block": 13
+    },
+    "rl": {
+      "last_line": 408,
+      "bold": 255,
+      "answer_marker": 134,
+      "currency": 115,
+      "none": 9,
+      "code_block": 2
+    }
+  }
+}

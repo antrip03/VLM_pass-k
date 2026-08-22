@@ -1,0 +1,794 @@
+{
+  "record_counts": {
+    "base/T": 6400,
+    "base/D": 6400,
+    "base/E": 6400,
+    "rl/T": 6400,
+    "rl/D": 6400,
+    "rl/E": 6400
+  },
+  "coverage": {
+    "T": {
+      "threshold_sweep": [
+        {
+          "threshold": 1,
+          "n_problems": 50,
+          "expansion_count": 1,
+          "contraction_count": 0,
+          "net_coverage_change": 1,
+          "both_reachable": 49,
+          "neither_reachable": 0,
+          "expansion_problem_idx": [
+            8
+          ],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        },
+        {
+          "threshold": 2,
+          "n_problems": 50,
+          "expansion_count": 1,
+          "contraction_count": 0,
+          "net_coverage_change": 1,
+          "both_reachable": 49,
+          "neither_reachable": 0,
+          "expansion_problem_idx": [
+            8
+          ],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        },
+        {
+          "threshold": 5,
+          "n_problems": 50,
+          "expansion_count": 1,
+          "contraction_count": 0,
+          "net_coverage_change": 1,
+          "both_reachable": 47,
+          "neither_reachable": 2,
+          "expansion_problem_idx": [
+            12
+          ],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        },
+        {
+          "threshold": 10,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 1,
+          "net_coverage_change": -1,
+          "both_reachable": 46,
+          "neither_reachable": 3,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [
+            7
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        }
+      ],
+      "density_shift": {
+        "threshold": 1,
+        "n_shared_reachable": 49,
+        "mean_rate_base": 0.6213,
+        "mean_rate_rl": 0.6808,
+        "mean_density_shift": 0.0595,
+        "n_rate_increased": 38,
+        "n_rate_decreased": 8,
+        "n_rate_unchanged": 3,
+        "sign_test_p_exact": 0.0
+      },
+      "histogram": {
+        "n_samples_per_problem": 128,
+        "bins": 8,
+        "bin_edges": [
+          0.0,
+          16.0,
+          32.0,
+          48.0,
+          64.0,
+          80.0,
+          96.0,
+          112.0,
+          128.0
+        ],
+        "base": [
+          5,
+          0,
+          5,
+          3,
+          10,
+          9,
+          9,
+          9
+        ],
+        "rl": [
+          4,
+          2,
+          4,
+          1,
+          8,
+          7,
+          6,
+          18
+        ]
+      }
+    },
+    "D": {
+      "threshold_sweep": [
+        {
+          "threshold": 1,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 0,
+          "net_coverage_change": 0,
+          "both_reachable": 49,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 0,
+          "underpowered": true
+        },
+        {
+          "threshold": 2,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 0,
+          "net_coverage_change": 0,
+          "both_reachable": 49,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 0,
+          "underpowered": true
+        },
+        {
+          "threshold": 5,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 0,
+          "net_coverage_change": 0,
+          "both_reachable": 49,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 0,
+          "underpowered": true
+        },
+        {
+          "threshold": 10,
+          "n_problems": 50,
+          "expansion_count": 2,
+          "contraction_count": 0,
+          "net_coverage_change": 2,
+          "both_reachable": 46,
+          "neither_reachable": 2,
+          "expansion_problem_idx": [
+            7,
+            12
+          ],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 0.5,
+          "discordant_total": 2,
+          "underpowered": true
+        }
+      ],
+      "density_shift": {
+        "threshold": 1,
+        "n_shared_reachable": 49,
+        "mean_rate_base": 0.6154,
+        "mean_rate_rl": 0.6888,
+        "mean_density_shift": 0.0733,
+        "n_rate_increased": 43,
+        "n_rate_decreased": 3,
+        "n_rate_unchanged": 3,
+        "sign_test_p_exact": 0.0
+      },
+      "histogram": {
+        "n_samples_per_problem": 128,
+        "bins": 8,
+        "bin_edges": [
+          0.0,
+          16.0,
+          32.0,
+          48.0,
+          64.0,
+          80.0,
+          96.0,
+          112.0,
+          128.0
+        ],
+        "base": [
+          4,
+          2,
+          3,
+          6,
+          10,
+          6,
+          12,
+          7
+        ],
+        "rl": [
+          4,
+          2,
+          3,
+          2,
+          5,
+          10,
+          5,
+          19
+        ]
+      }
+    },
+    "E": {
+      "threshold_sweep": [
+        {
+          "threshold": 1,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 1,
+          "net_coverage_change": -1,
+          "both_reachable": 49,
+          "neither_reachable": 0,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [
+            8
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        },
+        {
+          "threshold": 2,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 0,
+          "net_coverage_change": 0,
+          "both_reachable": 49,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 0,
+          "underpowered": true
+        },
+        {
+          "threshold": 5,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 0,
+          "net_coverage_change": 0,
+          "both_reachable": 49,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 0,
+          "underpowered": true
+        },
+        {
+          "threshold": 10,
+          "n_problems": 50,
+          "expansion_count": 2,
+          "contraction_count": 0,
+          "net_coverage_change": 2,
+          "both_reachable": 46,
+          "neither_reachable": 2,
+          "expansion_problem_idx": [
+            20,
+            37
+          ],
+          "contraction_problem_idx": [],
+          "mcnemar_p_exact": 0.5,
+          "discordant_total": 2,
+          "underpowered": true
+        }
+      ],
+      "density_shift": {
+        "threshold": 1,
+        "n_shared_reachable": 49,
+        "mean_rate_base": 0.5061,
+        "mean_rate_rl": 0.6006,
+        "mean_density_shift": 0.0945,
+        "n_rate_increased": 40,
+        "n_rate_decreased": 7,
+        "n_rate_unchanged": 2,
+        "sign_test_p_exact": 0.0
+      },
+      "histogram": {
+        "n_samples_per_problem": 128,
+        "bins": 8,
+        "bin_edges": [
+          0.0,
+          16.0,
+          32.0,
+          48.0,
+          64.0,
+          80.0,
+          96.0,
+          112.0,
+          128.0
+        ],
+        "base": [
+          4,
+          7,
+          8,
+          5,
+          5,
+          13,
+          7,
+          1
+        ],
+        "rl": [
+          5,
+          5,
+          3,
+          5,
+          8,
+          2,
+          9,
+          13
+        ]
+      }
+    }
+  },
+  "format_confound": {
+    "parse_rates": {
+      "T": {
+        "base": {
+          "total_samples": 6400,
+          "unparsed": 856,
+          "unparsed_rate": 0.1338,
+          "measured_accuracy": 0.6089
+        },
+        "rl": {
+          "total_samples": 6400,
+          "unparsed": 264,
+          "unparsed_rate": 0.0413,
+          "measured_accuracy": 0.6677
+        },
+        "asymmetry_base_minus_rl": 0.0925
+      },
+      "D": {
+        "base": {
+          "total_samples": 6400,
+          "unparsed": 859,
+          "unparsed_rate": 0.1342,
+          "measured_accuracy": 0.6031
+        },
+        "rl": {
+          "total_samples": 6400,
+          "unparsed": 246,
+          "unparsed_rate": 0.0384,
+          "measured_accuracy": 0.675
+        },
+        "asymmetry_base_minus_rl": 0.0958
+      },
+      "E": {
+        "base": {
+          "total_samples": 6400,
+          "unparsed": 1341,
+          "unparsed_rate": 0.2095,
+          "measured_accuracy": 0.4961
+        },
+        "rl": {
+          "total_samples": 6400,
+          "unparsed": 413,
+          "unparsed_rate": 0.0645,
+          "measured_accuracy": 0.5886
+        },
+        "asymmetry_base_minus_rl": 0.145
+      }
+    },
+    "per_condition": {
+      "T": {
+        "sensitivity": {
+          "condition": "T",
+          "delta_measured": 0.0587,
+          "unparsed_rate_base": 0.1338,
+          "unparsed_rate_rl": 0.0413,
+          "asymmetry": 0.0925,
+          "tipping_point_p": 0.6351,
+          "delta_worst_case": -0.075,
+          "verdict": "SENSITIVE: if 63.5% of unparsed completions were secretly correct, Delta would vanish. Compare against the measured upper bound."
+        },
+        "empirical_upper_bound": {
+          "condition": "T",
+          "tail_chars": 200,
+          "base": {
+            "unparsed": 856,
+            "gt_present": 592,
+            "upper_bound_rate": 0.6916
+          },
+          "rl": {
+            "unparsed": 264,
+            "gt_present": 149,
+            "upper_bound_rate": 0.5644
+          }
+        },
+        "verdict": "Delta_T is NOT established as robust: the measured upper bound (69.2%) reaches the tipping point (63.5%). Manual review of unparsed completions is required before reporting this Delta."
+      },
+      "D": {
+        "sensitivity": {
+          "condition": "D",
+          "delta_measured": 0.0719,
+          "unparsed_rate_base": 0.1342,
+          "unparsed_rate_rl": 0.0384,
+          "asymmetry": 0.0958,
+          "tipping_point_p": 0.7504,
+          "delta_worst_case": -0.0623,
+          "verdict": "SENSITIVE: if 75.0% of unparsed completions were secretly correct, Delta would vanish. Compare against the measured upper bound."
+        },
+        "empirical_upper_bound": {
+          "condition": "D",
+          "tail_chars": 200,
+          "base": {
+            "unparsed": 859,
+            "gt_present": 622,
+            "upper_bound_rate": 0.7241
+          },
+          "rl": {
+            "unparsed": 246,
+            "gt_present": 153,
+            "upper_bound_rate": 0.622
+          }
+        },
+        "verdict": "Delta_D survives: the measured upper bound on hidden correctness (72.4%) is below the tipping point (75.0%) needed to nullify it."
+      },
+      "E": {
+        "sensitivity": {
+          "condition": "E",
+          "delta_measured": 0.0925,
+          "unparsed_rate_base": 0.2095,
+          "unparsed_rate_rl": 0.0645,
+          "asymmetry": 0.145,
+          "tipping_point_p": 0.6379,
+          "delta_worst_case": -0.117,
+          "verdict": "SENSITIVE: if 63.8% of unparsed completions were secretly correct, Delta would vanish. Compare against the measured upper bound."
+        },
+        "empirical_upper_bound": {
+          "condition": "E",
+          "tail_chars": 200,
+          "base": {
+            "unparsed": 1341,
+            "gt_present": 931,
+            "upper_bound_rate": 0.6943
+          },
+          "rl": {
+            "unparsed": 413,
+            "gt_present": 245,
+            "upper_bound_rate": 0.5932
+          }
+        },
+        "verdict": "Delta_E is NOT established as robust: the measured upper bound (69.4%) reaches the tipping point (63.8%). Manual review of unparsed completions is required before reporting this Delta."
+      }
+    }
+  },
+  "difficulty_matched": {
+    "matched_subset_E_vs_T": {
+      "target_condition": "E",
+      "matched_condition": "T",
+      "target_base_mean": 0.4961,
+      "band": [
+        0.3961,
+        0.5961
+      ],
+      "n_matched": 12,
+      "n_total": 50,
+      "matched_base_mean": 0.5241,
+      "delta_T_full": 0.0587,
+      "delta_T_matched_subset": 0.0729,
+      "delta_E": 0.0925,
+      "gap_after_matching": 0.0196,
+      "underpowered": true,
+      "interpretation": "If gap_after_matching is near zero, the Delta_E > Delta_T ordering is explained by baseline difficulty (a floor effect) rather than by modality. If it remains clearly positive, the ordering survives the floor-effect explanation."
+    },
+    "matched_subset_D_vs_T": {
+      "target_condition": "D",
+      "matched_condition": "T",
+      "target_base_mean": 0.6031,
+      "band": [
+        0.5031,
+        0.7031
+      ],
+      "n_matched": 15,
+      "n_total": 50,
+      "matched_base_mean": 0.6026,
+      "delta_T_full": 0.0587,
+      "delta_T_matched_subset": 0.0568,
+      "delta_D": 0.0719,
+      "gap_after_matching": 0.0151,
+      "underpowered": true,
+      "interpretation": "If gap_after_matching is near zero, the Delta_D > Delta_T ordering is explained by baseline difficulty (a floor effect) rather than by modality. If it remains clearly positive, the ordering survives the floor-effect explanation."
+    },
+    "stratified_T_vs_E": {
+      "conditions": [
+        "T",
+        "E"
+      ],
+      "n_bins": 4,
+      "binned_on": "each observation's own base rate (pooled across conditions)",
+      "bin_edges": [
+        0.3359,
+        0.6016,
+        0.7578
+      ],
+      "bins": [
+        {
+          "bin": 0,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.0,
+            0.3281
+          ],
+          "T": {
+            "n": 9,
+            "mean_delta": 0.0104,
+            "mean_base_rate": 0.1562
+          },
+          "E": {
+            "n": 16,
+            "mean_delta": 0.0195,
+            "mean_base_rate": 0.188
+          },
+          "gap": 0.0091
+        },
+        {
+          "bin": 1,
+          "n_observations": 24,
+          "base_rate_range": [
+            0.3359,
+            0.5938
+          ],
+          "T": {
+            "n": 13,
+            "mean_delta": 0.0697,
+            "mean_base_rate": 0.5096
+          },
+          "E": {
+            "n": 11,
+            "mean_delta": 0.0916,
+            "mean_base_rate": 0.4446
+          },
+          "gap": 0.0219
+        },
+        {
+          "bin": 2,
+          "n_observations": 26,
+          "base_rate_range": [
+            0.6016,
+            0.75
+          ],
+          "T": {
+            "n": 10,
+            "mean_delta": 0.0656,
+            "mean_base_rate": 0.6797
+          },
+          "E": {
+            "n": 16,
+            "mean_delta": 0.1597,
+            "mean_base_rate": 0.7012
+          },
+          "gap": 0.0941
+        },
+        {
+          "bin": 3,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.7578,
+            0.9453
+          ],
+          "T": {
+            "n": 18,
+            "mean_delta": 0.0712,
+            "mean_base_rate": 0.8676
+          },
+          "E": {
+            "n": 7,
+            "mean_delta": 0.1071,
+            "mean_base_rate": 0.8125
+          },
+          "gap": 0.0359
+        }
+      ],
+      "weighted_mean_gap": 0.0409,
+      "bins_favouring_second_condition": "4/4",
+      "verdict": "ORDERING SURVIVES: Delta_E exceeds Delta_T in all 4 difficulty bins (weighted gap +0.0409). The ordering is not explained by baseline difficulty alone."
+    },
+    "stratified_T_vs_D": {
+      "conditions": [
+        "T",
+        "D"
+      ],
+      "n_bins": 4,
+      "binned_on": "each observation's own base rate (pooled across conditions)",
+      "bin_edges": [
+        0.4844,
+        0.6562,
+        0.8359
+      ],
+      "bins": [
+        {
+          "bin": 0,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.0,
+            0.4688
+          ],
+          "T": {
+            "n": 12,
+            "mean_delta": 0.0293,
+            "mean_base_rate": 0.2188
+          },
+          "D": {
+            "n": 13,
+            "mean_delta": 0.0337,
+            "mean_base_rate": 0.2446
+          },
+          "gap": 0.0044
+        },
+        {
+          "bin": 1,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.4844,
+            0.6484
+          ],
+          "T": {
+            "n": 13,
+            "mean_delta": 0.0541,
+            "mean_base_rate": 0.5601
+          },
+          "D": {
+            "n": 12,
+            "mean_delta": 0.1061,
+            "mean_base_rate": 0.5417
+          },
+          "gap": 0.052
+        },
+        {
+          "bin": 2,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.6562,
+            0.8281
+          ],
+          "T": {
+            "n": 13,
+            "mean_delta": 0.0919,
+            "mean_base_rate": 0.7488
+          },
+          "D": {
+            "n": 12,
+            "mean_delta": 0.0924,
+            "mean_base_rate": 0.7546
+          },
+          "gap": 0.0005
+        },
+        {
+          "bin": 3,
+          "n_observations": 25,
+          "base_rate_range": [
+            0.8359,
+            0.9609
+          ],
+          "T": {
+            "n": 12,
+            "mean_delta": 0.0573,
+            "mean_base_rate": 0.9004
+          },
+          "D": {
+            "n": 13,
+            "mean_delta": 0.0595,
+            "mean_base_rate": 0.8786
+          },
+          "gap": 0.0022
+        }
+      ],
+      "weighted_mean_gap": 0.0148,
+      "bins_favouring_second_condition": "4/4",
+      "verdict": "FLOOR EFFECT: once difficulty is held constant the gap collapses to +0.0148. The ordering should be reported as a baseline-level artifact, exactly as PLAN.md's result box anticipated."
+    }
+  },
+  "truncation": {
+    "max_new_tokens_configured": 1200,
+    "note": "Truncation symmetry from the saved records.\n\n    IMPORTANT LIMITATION, stated rather than papered over: the parquet\n    records store decoded TEXT, not the output token ids, so\n    src/controls/truncation_check.py's hit_max_tokens() - which needs the\n    ids and the EOS id - cannot be applied here. What we can measure is\n    the completion-length distribution and the rate of long completions\n    that also failed to parse, which is the observable SYMPTOM of\n    truncation that PLAN.md item 7 actually asks to be compared between\n    models. A length distribution bunched hard against the cap in one\n    model and not the other is the signal; this reports the inputs for\n    that judgement rather than asserting a binary verdict it cannot\n    support from this data.",
+    "T": {
+      "base": {
+        "n": 6400,
+        "chars_mean": 902.9,
+        "chars_p50": 830,
+        "chars_p90": 1429,
+        "chars_p99": 2210,
+        "chars_max": 3729,
+        "unparsed_among_longest_decile": 111
+      },
+      "rl": {
+        "n": 6400,
+        "chars_mean": 816.3,
+        "chars_p50": 743,
+        "chars_p90": 1319,
+        "chars_p99": 1984,
+        "chars_max": 3448,
+        "unparsed_among_longest_decile": 55
+      },
+      "p99_gap_rl_minus_base": -226
+    },
+    "D": {
+      "base": {
+        "n": 6400,
+        "chars_mean": 888.2,
+        "chars_p50": 816,
+        "chars_p90": 1417,
+        "chars_p99": 2151,
+        "chars_max": 3117,
+        "unparsed_among_longest_decile": 93
+      },
+      "rl": {
+        "n": 6400,
+        "chars_mean": 808.2,
+        "chars_p50": 736,
+        "chars_p90": 1302,
+        "chars_p99": 2024,
+        "chars_max": 3181,
+        "unparsed_among_longest_decile": 47
+      },
+      "p99_gap_rl_minus_base": -127
+    },
+    "E": {
+      "base": {
+        "n": 6400,
+        "chars_mean": 763.5,
+        "chars_p50": 698,
+        "chars_p90": 1285,
+        "chars_p99": 1989,
+        "chars_max": 4086,
+        "unparsed_among_longest_decile": 140
+      },
+      "rl": {
+        "n": 6400,
+        "chars_mean": 689.6,
+        "chars_p50": 624,
+        "chars_p90": 1172,
+        "chars_p99": 1936,
+        "chars_max": 4229,
+        "unparsed_among_longest_decile": 94
+      },
+      "p99_gap_rl_minus_base": -53
+    }
+  },
+  "transcription_fidelity": {
+    "base": {
+      "n_transcriptions": 6400,
+      "exact_match_rate": 0.96171875,
+      "mean_char_similarity": 0.9996618174000035,
+      "n_samples": 6400
+    },
+    "rl": {
+      "n_transcriptions": 6400,
+      "exact_match_rate": 0.95953125,
+      "mean_char_similarity": 0.9996143544784009,
+      "n_samples": 6400
+    }
+  },
+  "leakage": {
+    "skipped": "--no-leakage passed"
+  },
+  "spurious_correctness_pack": {
+    "review_path": "eval_results\\review_pack\\spurious_correctness_review.jsonl",
+    "key_path": "eval_results\\review_pack\\spurious_correctness_key.json",
+    "n_traces": 150,
+    "instructions": "Fill in `verdict` for every row in the .jsonl (sound|spurious|unclear), THEN run score_blinded_review() to join against the key. Do not open the key file first."
+  }
+}

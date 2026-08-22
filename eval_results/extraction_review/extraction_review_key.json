@@ -1,0 +1,722 @@
+{
+  "X0000": {
+    "model_kind": "base",
+    "predicted": "57",
+    "method": "last_line",
+    "ground_truth": "163"
+  },
+  "X0001": {
+    "model_kind": "rl",
+    "predicted": "4",
+    "method": "last_line",
+    "ground_truth": "45"
+  },
+  "X0002": {
+    "model_kind": "rl",
+    "predicted": "13",
+    "method": "last_line",
+    "ground_truth": "2"
+  },
+  "X0003": {
+    "model_kind": "base",
+    "predicted": "8",
+    "method": "last_line",
+    "ground_truth": "8"
+  },
+  "X0004": {
+    "model_kind": "rl",
+    "predicted": "70",
+    "method": "last_line",
+    "ground_truth": "70"
+  },
+  "X0005": {
+    "model_kind": "base",
+    "predicted": "700",
+    "method": "bold",
+    "ground_truth": "200"
+  },
+  "X0006": {
+    "model_kind": "rl",
+    "predicted": "75",
+    "method": "bold",
+    "ground_truth": "75"
+  },
+  "X0007": {
+    "model_kind": "base",
+    "predicted": "260",
+    "method": "answer_marker",
+    "ground_truth": "260"
+  },
+  "X0008": {
+    "model_kind": "base",
+    "predicted": "3",
+    "method": "answer_marker",
+    "ground_truth": "3"
+  },
+  "X0009": {
+    "model_kind": "base",
+    "predicted": "30",
+    "method": "answer_marker",
+    "ground_truth": "30"
+  },
+  "X0010": {
+    "model_kind": "base",
+    "predicted": "230",
+    "method": "bold",
+    "ground_truth": "230"
+  },
+  "X0011": {
+    "model_kind": "rl",
+    "predicted": "3",
+    "method": "last_line",
+    "ground_truth": "10"
+  },
+  "X0012": {
+    "model_kind": "base",
+    "predicted": "2",
+    "method": "bold",
+    "ground_truth": "2"
+  },
+  "X0013": {
+    "model_kind": "rl",
+    "predicted": "6",
+    "method": "bold",
+    "ground_truth": "6"
+  },
+  "X0014": {
+    "model_kind": "rl",
+    "predicted": "3",
+    "method": "last_line",
+    "ground_truth": "64"
+  },
+  "X0015": {
+    "model_kind": "base",
+    "predicted": "24",
+    "method": "bold",
+    "ground_truth": "64"
+  },
+  "X0016": {
+    "model_kind": "rl",
+    "predicted": "6",
+    "method": "bold",
+    "ground_truth": "3"
+  },
+  "X0017": {
+    "model_kind": "base",
+    "predicted": "17",
+    "method": "answer_marker",
+    "ground_truth": "14"
+  },
+  "X0018": {
+    "model_kind": "base",
+    "predicted": "2",
+    "method": "last_line",
+    "ground_truth": "14"
+  },
+  "X0019": {
+    "model_kind": "rl",
+    "predicted": "18",
+    "method": "bold",
+    "ground_truth": "18"
+  },
+  "X0020": {
+    "model_kind": "base",
+    "predicted": "13",
+    "method": "bold",
+    "ground_truth": "2"
+  },
+  "X0021": {
+    "model_kind": "rl",
+    "predicted": "26",
+    "method": "answer_marker",
+    "ground_truth": "26"
+  },
+  "X0022": {
+    "model_kind": "base",
+    "predicted": "3",
+    "method": "bold",
+    "ground_truth": "2"
+  },
+  "X0023": {
+    "model_kind": "rl",
+    "predicted": "70",
+    "method": "last_line",
+    "ground_truth": "70"
+  },
+  "X0024": {
+    "model_kind": "rl",
+    "predicted": "9",
+    "method": "last_line",
+    "ground_truth": "9"
+  },
+  "X0025": {
+    "model_kind": "base",
+    "predicted": "5",
+    "method": "last_line",
+    "ground_truth": "104"
+  },
+  "X0026": {
+    "model_kind": "base",
+    "predicted": "109",
+    "method": "answer_marker",
+    "ground_truth": "109"
+  },
+  "X0027": {
+    "model_kind": "rl",
+    "predicted": "20",
+    "method": "bold",
+    "ground_truth": "15"
+  },
+  "X0028": {
+    "model_kind": "rl",
+    "predicted": "180",
+    "method": "last_line",
+    "ground_truth": "540"
+  },
+  "X0029": {
+    "model_kind": "base",
+    "predicted": "16000",
+    "method": "last_line",
+    "ground_truth": "125"
+  },
+  "X0030": {
+    "model_kind": "base",
+    "predicted": null,
+    "method": "none",
+    "ground_truth": "9"
+  },
+  "X0031": {
+    "model_kind": "base",
+    "predicted": "1200",
+    "method": "last_line",
+    "ground_truth": "200"
+  },
+  "X0032": {
+    "model_kind": "base",
+    "predicted": "8",
+    "method": "last_line",
+    "ground_truth": "8"
+  },
+  "X0033": {
+    "model_kind": "base",
+    "predicted": "80",
+    "method": "last_line",
+    "ground_truth": "80"
+  },
+  "X0034": {
+    "model_kind": "rl",
+    "predicted": "30",
+    "method": "answer_marker",
+    "ground_truth": "30"
+  },
+  "X0035": {
+    "model_kind": "rl",
+    "predicted": "163",
+    "method": "last_line",
+    "ground_truth": "163"
+  },
+  "X0036": {
+    "model_kind": "base",
+    "predicted": "250000",
+    "method": "currency",
+    "ground_truth": "70000"
+  },
+  "X0037": {
+    "model_kind": "base",
+    "predicted": "109",
+    "method": "answer_marker",
+    "ground_truth": "109"
+  },
+  "X0038": {
+    "model_kind": "base",
+    "predicted": "60",
+    "method": "last_line",
+    "ground_truth": "60"
+  },
+  "X0039": {
+    "model_kind": "rl",
+    "predicted": "3.33",
+    "method": "bold",
+    "ground_truth": "10"
+  },
+  "X0040": {
+    "model_kind": "rl",
+    "predicted": "40",
+    "method": "last_line",
+    "ground_truth": "25"
+  },
+  "X0041": {
+    "model_kind": "rl",
+    "predicted": "8",
+    "method": "answer_marker",
+    "ground_truth": "8"
+  },
+  "X0042": {
+    "model_kind": "base",
+    "predicted": "7",
+    "method": "code_block",
+    "ground_truth": "104"
+  },
+  "X0043": {
+    "model_kind": "base",
+    "predicted": "21",
+    "method": "last_line",
+    "ground_truth": "14"
+  },
+  "X0044": {
+    "model_kind": "base",
+    "predicted": "35",
+    "method": "bold",
+    "ground_truth": "35"
+  },
+  "X0045": {
+    "model_kind": "rl",
+    "predicted": "377",
+    "method": "bold",
+    "ground_truth": "163"
+  },
+  "X0046": {
+    "model_kind": "rl",
+    "predicted": "4",
+    "method": "last_line",
+    "ground_truth": "7"
+  },
+  "X0047": {
+    "model_kind": "base",
+    "predicted": "3",
+    "method": "last_line",
+    "ground_truth": "15"
+  },
+  "X0048": {
+    "model_kind": "rl",
+    "predicted": "2",
+    "method": "bold",
+    "ground_truth": "13"
+  },
+  "X0049": {
+    "model_kind": "rl",
+    "predicted": "3",
+    "method": "last_line",
+    "ground_truth": "15"
+  },
+  "X0050": {
+    "model_kind": "base",
+    "predicted": "37250",
+    "method": "answer_marker",
+    "ground_truth": "57500"
+  },
+  "X0051": {
+    "model_kind": "base",
+    "predicted": "23",
+    "method": "last_line",
+    "ground_truth": "23"
+  },
+  "X0052": {
+    "model_kind": "base",
+    "predicted": "3",
+    "method": "bold",
+    "ground_truth": "6"
+  },
+  "X0053": {
+    "model_kind": "rl",
+    "predicted": "230",
+    "method": "bold",
+    "ground_truth": "230"
+  },
+  "X0054": {
+    "model_kind": "rl",
+    "predicted": "20",
+    "method": "currency",
+    "ground_truth": "20"
+  },
+  "X0055": {
+    "model_kind": "base",
+    "predicted": "16",
+    "method": "answer_marker",
+    "ground_truth": "16"
+  },
+  "X0056": {
+    "model_kind": "base",
+    "predicted": "260",
+    "method": "last_line",
+    "ground_truth": "260"
+  },
+  "X0057": {
+    "model_kind": "rl",
+    "predicted": "70",
+    "method": "last_line",
+    "ground_truth": "70"
+  },
+  "X0058": {
+    "model_kind": "base",
+    "predicted": "460",
+    "method": "currency",
+    "ground_truth": "460"
+  },
+  "X0059": {
+    "model_kind": "rl",
+    "predicted": "35",
+    "method": "last_line",
+    "ground_truth": "35"
+  },
+  "X0060": {
+    "model_kind": "base",
+    "predicted": "35",
+    "method": "bold",
+    "ground_truth": "35"
+  },
+  "X0061": {
+    "model_kind": "rl",
+    "predicted": "104",
+    "method": "currency",
+    "ground_truth": "104"
+  },
+  "X0062": {
+    "model_kind": "rl",
+    "predicted": "794",
+    "method": "bold",
+    "ground_truth": "694"
+  },
+  "X0063": {
+    "model_kind": "base",
+    "predicted": "20",
+    "method": "last_line",
+    "ground_truth": "14"
+  },
+  "X0064": {
+    "model_kind": "base",
+    "predicted": "8",
+    "method": "answer_marker",
+    "ground_truth": "8"
+  },
+  "X0065": {
+    "model_kind": "rl",
+    "predicted": "34",
+    "method": "last_line",
+    "ground_truth": "26"
+  },
+  "X0066": {
+    "model_kind": "rl",
+    "predicted": "16",
+    "method": "answer_marker",
+    "ground_truth": "16"
+  },
+  "X0067": {
+    "model_kind": "base",
+    "predicted": "75",
+    "method": "bold",
+    "ground_truth": "75"
+  },
+  "X0068": {
+    "model_kind": "rl",
+    "predicted": "0",
+    "method": "answer_marker",
+    "ground_truth": "2"
+  },
+  "X0069": {
+    "model_kind": "base",
+    "predicted": "97.46",
+    "method": "last_line",
+    "ground_truth": "160"
+  },
+  "X0070": {
+    "model_kind": "base",
+    "predicted": "00",
+    "method": "last_line",
+    "ground_truth": "8"
+  },
+  "X0071": {
+    "model_kind": "rl",
+    "predicted": "5",
+    "method": "last_line",
+    "ground_truth": "25"
+  },
+  "X0072": {
+    "model_kind": "base",
+    "predicted": "54.40",
+    "method": "bold",
+    "ground_truth": "64"
+  },
+  "X0073": {
+    "model_kind": "rl",
+    "predicted": null,
+    "method": "none",
+    "ground_truth": "2"
+  },
+  "X0074": {
+    "model_kind": "rl",
+    "predicted": "75",
+    "method": "answer_marker",
+    "ground_truth": "75"
+  },
+  "X0075": {
+    "model_kind": "base",
+    "predicted": "70",
+    "method": "last_line",
+    "ground_truth": "70"
+  },
+  "X0076": {
+    "model_kind": "rl",
+    "predicted": "460",
+    "method": "currency",
+    "ground_truth": "460"
+  },
+  "X0077": {
+    "model_kind": "rl",
+    "predicted": "3",
+    "method": "last_line",
+    "ground_truth": "3"
+  },
+  "X0078": {
+    "model_kind": "base",
+    "predicted": "25",
+    "method": "answer_marker",
+    "ground_truth": "125"
+  },
+  "X0079": {
+    "model_kind": "rl",
+    "predicted": "197",
+    "method": "last_line",
+    "ground_truth": "163"
+  },
+  "X0080": {
+    "model_kind": "base",
+    "predicted": "64",
+    "method": "answer_marker",
+    "ground_truth": "64"
+  },
+  "X0081": {
+    "model_kind": "base",
+    "predicted": "00",
+    "method": "last_line",
+    "ground_truth": "8"
+  },
+  "X0082": {
+    "model_kind": "rl",
+    "predicted": "35",
+    "method": "bold",
+    "ground_truth": "35"
+  },
+  "X0083": {
+    "model_kind": "rl",
+    "predicted": "1",
+    "method": "answer_marker",
+    "ground_truth": "2"
+  },
+  "X0084": {
+    "model_kind": "rl",
+    "predicted": "104",
+    "method": "currency",
+    "ground_truth": "104"
+  },
+  "X0085": {
+    "model_kind": "rl",
+    "predicted": "7",
+    "method": "last_line",
+    "ground_truth": "7"
+  },
+  "X0086": {
+    "model_kind": "base",
+    "predicted": "00",
+    "method": "last_line",
+    "ground_truth": "8"
+  },
+  "X0087": {
+    "model_kind": "rl",
+    "predicted": "5",
+    "method": "last_line",
+    "ground_truth": "14"
+  },
+  "X0088": {
+    "model_kind": "base",
+    "predicted": "230",
+    "method": "bold",
+    "ground_truth": "230"
+  },
+  "X0089": {
+    "model_kind": "rl",
+    "predicted": "64",
+    "method": "bold",
+    "ground_truth": "64"
+  },
+  "X0090": {
+    "model_kind": "base",
+    "predicted": "14",
+    "method": "last_line",
+    "ground_truth": "14"
+  },
+  "X0091": {
+    "model_kind": "base",
+    "predicted": "35",
+    "method": "bold",
+    "ground_truth": "35"
+  },
+  "X0092": {
+    "model_kind": "rl",
+    "predicted": "310",
+    "method": "last_line",
+    "ground_truth": "230"
+  },
+  "X0093": {
+    "model_kind": "rl",
+    "predicted": "20",
+    "method": "bold",
+    "ground_truth": "20"
+  },
+  "X0094": {
+    "model_kind": "rl",
+    "predicted": "70",
+    "method": "last_line",
+    "ground_truth": "70"
+  },
+  "X0095": {
+    "model_kind": "base",
+    "predicted": "13",
+    "method": "last_line",
+    "ground_truth": "13"
+  },
+  "X0096": {
+    "model_kind": "rl",
+    "predicted": "13",
+    "method": "bold",
+    "ground_truth": "13"
+  },
+  "X0097": {
+    "model_kind": "base",
+    "predicted": "18",
+    "method": "bold",
+    "ground_truth": "18"
+  },
+  "X0098": {
+    "model_kind": "rl",
+    "predicted": "64",
+    "method": "bold",
+    "ground_truth": "64"
+  },
+  "X0099": {
+    "model_kind": "rl",
+    "predicted": "64",
+    "method": "bold",
+    "ground_truth": "64"
+  },
+  "X0100": {
+    "model_kind": "base",
+    "predicted": "26",
+    "method": "answer_marker",
+    "ground_truth": "26"
+  },
+  "X0101": {
+    "model_kind": "base",
+    "predicted": "70",
+    "method": "bold",
+    "ground_truth": "70"
+  },
+  "X0102": {
+    "model_kind": "rl",
+    "predicted": "26",
+    "method": "last_line",
+    "ground_truth": "26"
+  },
+  "X0103": {
+    "model_kind": "base",
+    "predicted": "7",
+    "method": "answer_marker",
+    "ground_truth": "7"
+  },
+  "X0104": {
+    "model_kind": "rl",
+    "predicted": "800",
+    "method": "answer_marker",
+    "ground_truth": "800"
+  },
+  "X0105": {
+    "model_kind": "base",
+    "predicted": "64",
+    "method": "currency",
+    "ground_truth": "64"
+  },
+  "X0106": {
+    "model_kind": "rl",
+    "predicted": "694",
+    "method": "answer_marker",
+    "ground_truth": "694"
+  },
+  "X0107": {
+    "model_kind": "base",
+    "predicted": "48",
+    "method": "last_line",
+    "ground_truth": "48"
+  },
+  "X0108": {
+    "model_kind": "rl",
+    "predicted": "104",
+    "method": "last_line",
+    "ground_truth": "104"
+  },
+  "X0109": {
+    "model_kind": "rl",
+    "predicted": "1.904",
+    "method": "bold",
+    "ground_truth": "10"
+  },
+  "X0110": {
+    "model_kind": "base",
+    "predicted": "40",
+    "method": "last_line",
+    "ground_truth": "9"
+  },
+  "X0111": {
+    "model_kind": "rl",
+    "predicted": "109",
+    "method": "bold",
+    "ground_truth": "109"
+  },
+  "X0112": {
+    "model_kind": "rl",
+    "predicted": "16",
+    "method": "bold",
+    "ground_truth": "16"
+  },
+  "X0113": {
+    "model_kind": "base",
+    "predicted": "80",
+    "method": "answer_marker",
+    "ground_truth": "80"
+  },
+  "X0114": {
+    "model_kind": "base",
+    "predicted": "2",
+    "method": "last_line",
+    "ground_truth": "3"
+  },
+  "X0115": {
+    "model_kind": "base",
+    "predicted": "5",
+    "method": "last_line",
+    "ground_truth": "2"
+  },
+  "X0116": {
+    "model_kind": "rl",
+    "predicted": "26",
+    "method": "last_line",
+    "ground_truth": "26"
+  },
+  "X0117": {
+    "model_kind": "rl",
+    "predicted": "4",
+    "method": "last_line",
+    "ground_truth": "6"
+  },
+  "X0118": {
+    "model_kind": "base",
+    "predicted": null,
+    "method": "none",
+    "ground_truth": "8"
+  },
+  "X0119": {
+    "model_kind": "rl",
+    "predicted": "22",
+    "method": "bold",
+    "ground_truth": "18"
+  }
+}
