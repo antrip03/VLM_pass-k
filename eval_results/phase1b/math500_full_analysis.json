@@ -1,0 +1,263 @@
+{
+  "tag": "math500_full",
+  "pass_at_k": {
+    "strict/base/T/k=1": {
+      "mean": 0.4631,
+      "ci": [
+        0.3709,
+        0.5583
+      ]
+    },
+    "strict/rl/T/k=1": {
+      "mean": 0.4591,
+      "ci": [
+        0.3659,
+        0.5567
+      ]
+    },
+    "strict/base/T/k=8": {
+      "mean": 0.801,
+      "ci": [
+        0.7152,
+        0.8799
+      ]
+    },
+    "strict/rl/T/k=8": {
+      "mean": 0.7824,
+      "ci": [
+        0.6914,
+        0.8666
+      ]
+    },
+    "strict/base/T/k=64": {
+      "mean": 0.9531,
+      "ci": [
+        0.8922,
+        0.9958
+      ]
+    },
+    "strict/rl/T/k=64": {
+      "mean": 0.9411,
+      "ci": [
+        0.8751,
+        0.9897
+      ]
+    },
+    "fallback/base/T/k=1": {
+      "mean": 0.4841,
+      "ci": [
+        0.3867,
+        0.5844
+      ]
+    },
+    "fallback/rl/T/k=1": {
+      "mean": 0.4669,
+      "ci": [
+        0.3706,
+        0.5666
+      ]
+    },
+    "fallback/base/T/k=8": {
+      "mean": 0.802,
+      "ci": [
+        0.715,
+        0.8817
+      ]
+    },
+    "fallback/rl/T/k=8": {
+      "mean": 0.7773,
+      "ci": [
+        0.684,
+        0.8644
+      ]
+    },
+    "fallback/base/T/k=64": {
+      "mean": 0.9542,
+      "ci": [
+        0.8934,
+        0.9966
+      ]
+    },
+    "fallback/rl/T/k=64": {
+      "mean": 0.9402,
+      "ci": [
+        0.8746,
+        0.9893
+      ]
+    }
+  },
+  "deltas": {
+    "strict/Delta_T/k=1": {
+      "delta": -0.0041,
+      "ci": [
+        -0.0231,
+        0.0162
+      ],
+      "significant": false
+    },
+    "strict/Delta_T/k=8": {
+      "delta": -0.0186,
+      "ci": [
+        -0.039,
+        -0.0011
+      ],
+      "significant": true
+    },
+    "strict/Delta_T/k=64": {
+      "delta": -0.012,
+      "ci": [
+        -0.0614,
+        0.0243
+      ],
+      "significant": false
+    },
+    "fallback/Delta_T/k=1": {
+      "delta": -0.0172,
+      "ci": [
+        -0.0316,
+        -0.0033
+      ],
+      "significant": true
+    },
+    "fallback/Delta_T/k=8": {
+      "delta": -0.0246,
+      "ci": [
+        -0.045,
+        -0.007
+      ],
+      "significant": true
+    },
+    "fallback/Delta_T/k=64": {
+      "delta": -0.014,
+      "ci": [
+        -0.0631,
+        0.0228
+      ],
+      "significant": false
+    }
+  },
+  "coverage": {
+    "T": {
+      "threshold_sweep": [
+        {
+          "threshold": 1,
+          "n_problems": 50,
+          "expansion_count": 1,
+          "contraction_count": 1,
+          "net_coverage_change": 0,
+          "both_reachable": 47,
+          "neither_reachable": 1,
+          "expansion_problem_idx": [
+            7
+          ],
+          "contraction_problem_idx": [
+            19
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 2,
+          "underpowered": true
+        },
+        {
+          "threshold": 2,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 1,
+          "net_coverage_change": -1,
+          "both_reachable": 47,
+          "neither_reachable": 2,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [
+            19
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        },
+        {
+          "threshold": 5,
+          "n_problems": 50,
+          "expansion_count": 2,
+          "contraction_count": 1,
+          "net_coverage_change": 1,
+          "both_reachable": 43,
+          "neither_reachable": 4,
+          "expansion_problem_idx": [
+            3,
+            39
+          ],
+          "contraction_problem_idx": [
+            19
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 3,
+          "underpowered": true
+        },
+        {
+          "threshold": 10,
+          "n_problems": 50,
+          "expansion_count": 0,
+          "contraction_count": 1,
+          "net_coverage_change": -1,
+          "both_reachable": 41,
+          "neither_reachable": 8,
+          "expansion_problem_idx": [],
+          "contraction_problem_idx": [
+            48
+          ],
+          "mcnemar_p_exact": 1.0,
+          "discordant_total": 1,
+          "underpowered": true
+        }
+      ],
+      "density_shift": {
+        "threshold": 1,
+        "n_shared_reachable": 47,
+        "mean_rate_base": 0.4919,
+        "mean_rate_rl": 0.4882,
+        "mean_density_shift": -0.0037,
+        "n_rate_increased": 21,
+        "n_rate_decreased": 22,
+        "n_rate_unchanged": 4,
+        "sign_test_p_exact": 1.0
+      },
+      "histogram": {
+        "n_samples_per_problem": 128,
+        "bins": 8,
+        "bin_edges": [
+          0.0,
+          16.0,
+          32.0,
+          48.0,
+          64.0,
+          80.0,
+          96.0,
+          112.0,
+          128.0
+        ],
+        "base": [
+          12,
+          7,
+          6,
+          1,
+          3,
+          6,
+          7,
+          8
+        ],
+        "rl": [
+          14,
+          4,
+          5,
+          3,
+          5,
+          5,
+          8,
+          6
+        ]
+      }
+    }
+  },
+  "ceiling_verdict": {
+    "T": "STILL SATURATED: base pass@64 = 0.9542. This set does not fix the ceiling - a flat Delta at k=64 here remains uninformative, exactly as on plain GSM8K. Try a harder set or more aggressive perturbations."
+  }
+}

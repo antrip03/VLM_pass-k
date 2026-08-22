@@ -1,0 +1,48 @@
+{
+  "tag": "math500_full",
+  "dataset": "math500",
+  "model_kind": "rl",
+  "n": 128,
+  "problems": 50,
+  "conditions": [
+    "T"
+  ],
+  "records": 6400,
+  "elapsed_hr": 0.75,
+  "vision_sha256": "48ed880e74c758bacf38d0fb424026e0de0aefdd38339156664e8f64b57163cf",
+  "dataset_stats": {
+    "repo": "HuggingFaceH4/MATH-500",
+    "levels": [
+      3,
+      4,
+      5
+    ],
+    "rows_seen": 367,
+    "dropped_non_numeric_answer": 142,
+    "retained_fraction": 0.6131,
+    "examples_returned": 50,
+    "numeric_only": true,
+    "problems_requested": 50,
+    "problems_matched": 50,
+    "problems_missing": [],
+    "coverage": 1.0,
+    "type_breakdown": {
+      "MATH level 3": null,
+      "MATH level 4": null,
+      "MATH level 5": null
+    },
+    "pairs_with_phase1_records": false
+  },
+  "per_condition": {
+    "T": {
+      "pass_at_1": 0.4591,
+      "pass_at_1_fallback": 0.4669,
+      "pass_at_8": 0.7824,
+      "pass_at_64": 0.9411,
+      "pass_at_64_fallback": 0.9402,
+      "no_answer_rate": 0.11,
+      "format_compliance_rate": 0.89
+    }
+  },
+  "out_path": "/results/math500_full_records_rl.parquet"
+}
