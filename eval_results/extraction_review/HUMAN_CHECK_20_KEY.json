@@ -1,0 +1,122 @@
+{
+  "X0002": {
+    "claude_said": "none",
+    "extractor_said": "13",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0011": {
+    "claude_said": "none",
+    "extractor_said": "3",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0014": {
+    "claude_said": "none",
+    "extractor_said": "3",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0030": {
+    "claude_said": "none",
+    "extractor_said": null,
+    "method": "none",
+    "model": "base"
+  },
+  "X0031": {
+    "claude_said": "none",
+    "extractor_said": "1200",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0047": {
+    "claude_said": "none",
+    "extractor_said": "3",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0049": {
+    "claude_said": "none",
+    "extractor_said": "3",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0073": {
+    "claude_said": "none",
+    "extractor_said": null,
+    "method": "none",
+    "model": "rl"
+  },
+  "X0087": {
+    "claude_said": "none",
+    "extractor_said": "5",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0114": {
+    "claude_said": "none",
+    "extractor_said": "2",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0118": {
+    "claude_said": "none",
+    "extractor_said": null,
+    "method": "none",
+    "model": "base"
+  },
+  "X0001": {
+    "claude_said": "435",
+    "extractor_said": "4",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0046": {
+    "claude_said": "7",
+    "extractor_said": "4",
+    "method": "last_line",
+    "model": "rl"
+  },
+  "X0070": {
+    "claude_said": "8",
+    "extractor_said": "00",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0072": {
+    "claude_said": "54.4",
+    "extractor_said": "54.40",
+    "method": "bold",
+    "model": "base"
+  },
+  "X0081": {
+    "claude_said": "8",
+    "extractor_said": "00",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0086": {
+    "claude_said": "8",
+    "extractor_said": "00",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0110": {
+    "claude_said": "9",
+    "extractor_said": "40",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0000": {
+    "claude_said": "57",
+    "extractor_said": "57",
+    "method": "last_line",
+    "model": "base"
+  },
+  "X0019": {
+    "claude_said": "18",
+    "extractor_said": "18",
+    "method": "bold",
+    "model": "rl"
+  }
+}

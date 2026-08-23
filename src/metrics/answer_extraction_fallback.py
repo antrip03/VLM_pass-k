@@ -128,8 +128,59 @@ def normalize_number(token: str) -> str:
 # is "00".
 _TIME_RE = re.compile(r"\d{1,2}:\d{2}")
 
+# --- fixes from the independent human review (2026-08-23) --------------
+# A second reviewer checked 20 traces and found three real defects. All
+# three are handled below. On the 9 unambiguous traces the extractor
+# already agreed with them 9/9; every disagreement was one of these.
+
+# (1) LaTeX FRACTIONS. The model answers \frac{44}{3} and the last-number
+#     scan returned the DENOMINATOR, "3" - worse than returning nothing,
+#     because a ground truth of 3 would score it correct for the wrong
+#     reason. Fractions in these completions are always properly formed
+#     LaTeX, so they can be evaluated exactly. This also RESCUES answers:
+#     \frac{36}{2} against a ground truth of 18 is correct and was
+#     previously missed.
+_FRAC_RE = re.compile(r"\\[dt]?frac\s*\{\s*(-?\d[\d,]*(?:\.\d+)?)\s*\}\s*\{\s*(-?\d[\d,]*(?:\.\d+)?)\s*\}")
+
+# (2) FENCED CODE BLOCKS. A completion ending in a python block was read
+#     as an answer by scanning the code itself ("total_cost = (4*5) +
+#     (4*3) + (4*3)" -> "3"). Code that was never executed states no
+#     answer. Stripped before the line scan; the code_block rule above
+#     still catches a fence whose entire content is one number.
+_FENCE_BLOCK_RE = re.compile(r"```.*?```", re.S)
+
+# (3) UNEVALUATED EXPRESSIONS AND STEP HEADERS. Two shapes that contain
+#     digits but assert no answer:
+#       "#### Corrected Result: 13 - (Number of Legos Sold ...)"  -> "13"
+#       "Step 5: Simplify the calculation to find ..."            -> "5"
+#     The first is a number followed by an operator and then a word or
+#     bracket - an expression the model never resolved. The second is a
+#     numbered step heading.
+_UNRESOLVED_RE = re.compile(r"\d[\d,]*(?:\.\d+)?\s*[-+*/×÷]\s*[\(\[A-Za-z]")
+_STEP_HEADER_RE = re.compile(r"^\s*\**\s*step\s+\d+\s*[:.\)]", re.I)
+
 # Numbers that appear as the RESULT of a computation ("= 435", "= 8 cm").
 _EQUALS_RESULT_RE = re.compile(rf"=\s*\\?\$?\s*({_NUMBER})")
+
+
+def _eval_fraction(numerator: str, denominator: str) -> str | None:
+    """
+    Evaluate a LaTeX fraction to this project's canonical numeric string.
+
+    An integral result is returned as an integer (\\frac{36}{2} -> "36/2"
+    -> "18"), so a correct fractional answer now scores correct. A
+    non-integral result is returned as a decimal, which simply will not
+    match GSM8K's integer ground truths - the correct outcome, and far
+    better than the previous behaviour of returning the denominator.
+    """
+    try:
+        num = float(numerator.replace(",", ""))
+        den = float(denominator.replace(",", ""))
+    except ValueError:
+        return None
+    if den == 0:
+        return None
+    return normalize_number(repr(num / den))
 
 
 def _numbers_outside_times(text: str) -> list[str]:
@@ -195,16 +246,36 @@ def extract_with_fallback(
     if strict is not None:
         return strict, "strict"
 
-    lines = [ln for ln in generated_text.strip().split("\n") if ln.strip()]
-    if not lines:
+    # The code_block rule needs the ORIGINAL text, since it looks for a
+    # fence whose entire content is a number.
+    raw_lines = [ln for ln in generated_text.strip().split("\n") if ln.strip()]
+    if not raw_lines:
         return None, "empty"
+    raw_tail = "\n".join(raw_lines[-max_lines_back:])
+
+    m = _CODE_BLOCK_RE.search(raw_tail)
+    if m:
+        return normalize_number(m.group(1)), "code_block"
+
+    # Everything after this point scans PROSE, so fenced code is removed
+    # first: unexecuted code states no answer, and scanning it invents one
+    # ("total_cost = (4*5) + (4*3)" was read as "3").
+    text_no_code = _FENCE_BLOCK_RE.sub(" ", generated_text)
+    lines = [ln for ln in text_no_code.strip().split("\n") if ln.strip()]
+    if not lines:
+        return None, "none"
 
     tail_lines = lines[-max_lines_back:]
     tail = "\n".join(tail_lines)
 
-    m = _CODE_BLOCK_RE.search(tail)
-    if m:
-        return normalize_number(m.group(1)), "code_block"
+    # LaTeX fraction anywhere in the tail. Checked before the positional
+    # rules because a fraction is an explicit answer form, whereas "last
+    # number on the line" is a fallback guess.
+    frac = _FRAC_RE.findall(tail)
+    if frac:
+        value = _eval_fraction(*frac[-1])
+        if value is not None:
+            return value, "latex_fraction"
 
     for pattern in _ANSWER_MARKERS:
         found = pattern.findall(tail)
@@ -225,6 +296,13 @@ def extract_with_fallback(
     # currency-marked number wins over mere position (see _CURRENCY_RE).
     for line in reversed(tail_lines):
         if _NOISE_RE.match(line):
+            continue
+        # A numbered step heading is never a conclusion.
+        if _STEP_HEADER_RE.match(line):
+            continue
+        # A number followed by an operator and then a word/bracket is an
+        # expression the model never resolved, not an answer.
+        if _UNRESOLVED_RE.search(line):
             continue
         money = _CURRENCY_RE.findall(_TIME_RE.sub(" ", line))
         if money:

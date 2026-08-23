@@ -12,16 +12,16 @@
         "significant": true
       },
       "fallback": {
-        "base_pass_at_1": 0.6986,
-        "rl_pass_at_1": 0.6894,
-        "delta": -0.0092,
+        "base_pass_at_1": 0.6955,
+        "rl_pass_at_1": 0.6886,
+        "delta": -0.0069,
         "ci": [
-          -0.0227,
-          0.0034
+          -0.0208,
+          0.0064
         ],
         "significant": false
       },
-      "format_component": 0.0679
+      "format_component": 0.0656
     },
     "D": {
       "strict": {
@@ -35,16 +35,16 @@
         "significant": true
       },
       "fallback": {
-        "base_pass_at_1": 0.6978,
-        "rl_pass_at_1": 0.698,
-        "delta": 0.0002,
+        "base_pass_at_1": 0.6927,
+        "rl_pass_at_1": 0.6978,
+        "delta": 0.0052,
         "ci": [
-          -0.013,
-          0.0136
+          -0.0089,
+          0.0194
         ],
         "significant": false
       },
-      "format_component": 0.0717
+      "format_component": 0.0667
     },
     "E": {
       "strict": {
@@ -58,32 +58,34 @@
         "significant": true
       },
       "fallback": {
-        "base_pass_at_1": 0.6348,
-        "rl_pass_at_1": 0.6239,
-        "delta": -0.0109,
+        "base_pass_at_1": 0.628,
+        "rl_pass_at_1": 0.6231,
+        "delta": -0.0048,
         "ci": [
-          -0.0248,
-          0.0036
+          -0.0203,
+          0.0114
         ],
         "significant": false
       },
-      "format_component": 0.1034
+      "format_component": 0.0973
     }
   },
   "extraction_methods": {
     "base": {
-      "last_line": 1325,
-      "bold": 735,
-      "answer_marker": 543,
-      "currency": 414,
+      "last_line": 1104,
+      "bold": 648,
+      "answer_marker": 503,
+      "latex_fraction": 387,
+      "currency": 375,
       "none": 26,
       "code_block": 13
     },
     "rl": {
-      "last_line": 408,
-      "bold": 255,
-      "answer_marker": 134,
+      "last_line": 344,
+      "bold": 222,
+      "answer_marker": 127,
       "currency": 115,
+      "latex_fraction": 104,
       "none": 9,
       "code_block": 2
     }

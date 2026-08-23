@@ -67,6 +67,7 @@ containers, ~$2-3 at the rate the Phase 1 eval actually billed.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -92,6 +93,12 @@ EVAL_GPU = "A10G"
 # not, the mechanism is visible in the first few steps.
 DEFAULT_STEPS = (5, 75, 150, 300, 467)
 
+# Which condition analyze_trajectory reads out of the saved records is
+# an explicit PARAMETER, not an env var: analyze_trajectory runs in a
+# Modal container where a locally-exported variable does not exist, so
+# an env-var default would have silently read condition "T" out of an
+# E-only sweep and reported an empty result as a null.
+
 
 def _available_steps() -> list[int]:
     """Steps that have the loader's actor .pt file on the Hub."""
@@ -113,7 +120,9 @@ def _available_steps() -> list[int]:
     timeout=6 * 60 * 60,
     secrets=[modal.Secret.from_dict({})],  # replaced per-call with the real HF token
 )
-def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
+def eval_checkpoint_text_only(step: int | None, n: int, problems: int,
+                              conditions: list[str] | None = None,
+                              image_chunk: int = 32) -> dict:
     """
     Condition-T pass@1 (and pass@k) for one checkpoint.
 
@@ -145,9 +154,12 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
     )
 
     examples = load_gsm8k("test")[:problems]
-    records = run_sampling(model, processor, examples, conditions=["T"], n=n, progress_label=label)
+    conditions = conditions or ["T"]
+    records = run_sampling(model, processor, examples, conditions=conditions, n=n,
+                           progress_label=label, image_chunk=image_chunk)
 
-    out_path = f"{RESULTS_DIR}/trajectory_records_{label}.parquet"
+    tag = "".join(conditions)
+    out_path = f"{RESULTS_DIR}/trajectory_{tag}_records_{label}.parquet"
     save_sampling_records(records, out_path)
     results_volume.commit()
 
@@ -187,7 +199,7 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
         ),
         "out_path": out_path,
     }
-    with open(f"{RESULTS_DIR}/trajectory_summary_{label}.json", "w") as f:
+    with open(f"{RESULTS_DIR}/trajectory_{tag}_summary_{label}.json", "w") as f:
         json.dump(summary, f, indent=2)
     results_volume.commit()
     print(json.dumps(summary, indent=2), flush=True)
@@ -195,7 +207,7 @@ def eval_checkpoint_text_only(step: int | None, n: int, problems: int) -> dict:
 
 
 @app.function(image=image, volumes={RESULTS_DIR: results_volume}, timeout=60 * 60)
-def analyze_trajectory(labels: str) -> dict:
+def analyze_trajectory(labels: str, condition: str = "T") -> dict:
     """
     Assemble the per-checkpoint summaries into a trajectory, with paired
     bootstrap CIs on Delta_text at each step relative to base.
@@ -217,14 +229,21 @@ def analyze_trajectory(labels: str) -> dict:
     if "base" not in labels:
         raise ValueError("labels must include 'base' - it is the reference for every Delta")
 
-    def per_problem(label: str, col: str = "correct"):
-        df = load_sampling_records(f"{RESULTS_DIR}/trajectory_records_{label}.parquet")
-        g = df[df["condition"] == "T"].groupby("problem_idx")[col]
+    def per_problem(label: str, col: str = "correct"):  # noqa: ANN202
+        df = load_sampling_records(f"{RESULTS_DIR}/trajectory_{condition}_records_{label}.parquet")
+        sub = df[df["condition"] == condition]
+        if sub.empty:
+            raise ValueError(
+                f"No records for condition {condition!r} in {label} - the sweep may have "
+                f"been run with different conditions. Present: "
+                f"{sorted(df['condition'].unique())}"
+            )
+        g = sub.groupby("problem_idx")[col]
         return [(int(c), int(s)) for c, s in zip(g.count(), g.sum())]
 
     summaries = {}
     for label in labels:
-        with open(f"{RESULTS_DIR}/trajectory_summary_{label}.json") as f:
+        with open(f"{RESULTS_DIR}/trajectory_{condition}_summary_{label}.json") as f:
             summaries[label] = json.load(f)
 
     base_pp = per_problem("base")
@@ -299,7 +318,7 @@ def analyze_trajectory(labels: str) -> dict:
     out = {"base_pass_at_1_strict": summaries["base"]["pass_at_1"],
            "base_pass_at_1_fallback": summaries["base"].get("pass_at_1_fallback"), "trajectory": trajectory,
            "verdict": verdict}
-    with open(f"{RESULTS_DIR}/trajectory_analysis.json", "w") as f:
+    with open(f"{RESULTS_DIR}/trajectory_{condition}_analysis.json", "w") as f:
         json.dump(out, f, indent=2)
     results_volume.commit()
     print(json.dumps(out, indent=2), flush=True)
@@ -307,13 +326,15 @@ def analyze_trajectory(labels: str) -> dict:
 
 
 @app.local_entrypoint()
-def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool = True):
+def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool = True,
+         conditions: str = "T", image_chunk: int = 32):
     import os
 
     # No token required - the checkpoint repo is public (verified
     # 2026-08-22). Honoured if present, to raise Hub rate limits.
     hf_token = os.environ.get("HF_TOKEN", "")
 
+    cond_list = [c for c in conditions if c in ("T", "D", "E")] or ["T"]
     step_list = [int(s) for s in steps.split(",") if s.strip()] if steps else list(DEFAULT_STEPS)
     available = _available_steps()
     bad = [s for s in step_list if s not in available]
@@ -336,7 +357,7 @@ def main(steps: str = "", n: int = 128, problems: int = 50, include_base: bool =
     calls = {}
     for step in targets:
         label = "base" if step is None else f"step_{step}"
-        calls[label] = fn.spawn(step, n, problems)
+        calls[label] = fn.spawn(step, n, problems, cond_list, image_chunk)
         print(f"  {label}: call_id={calls[label].object_id}")
 
     # BLOCK - see the module docstring. An un-awaited spawn is killed when

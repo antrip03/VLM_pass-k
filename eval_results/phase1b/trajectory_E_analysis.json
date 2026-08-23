@@ -1,0 +1,102 @@
+{
+  "base_pass_at_1_strict": 0.4912,
+  "base_pass_at_1_fallback": 0.6412,
+  "trajectory": [
+    {
+      "label": "step_5",
+      "step": 5,
+      "format_compliance_rate": 0.7894,
+      "pass_at_1_strict": 0.4975,
+      "pass_at_1_fallback": 0.6287,
+      "delta_text_strict": 0.0063,
+      "ci_strict": [
+        -0.0225,
+        0.035
+      ],
+      "significant_strict": false,
+      "delta_text_fallback": -0.0125,
+      "ci_fallback": [
+        -0.0363,
+        0.0106
+      ],
+      "significant_fallback": false
+    },
+    {
+      "label": "step_75",
+      "step": 75,
+      "format_compliance_rate": 0.8306,
+      "pass_at_1_strict": 0.53,
+      "pass_at_1_fallback": 0.6381,
+      "delta_text_strict": 0.0388,
+      "ci_strict": [
+        0.01,
+        0.0681
+      ],
+      "significant_strict": true,
+      "delta_text_fallback": -0.0031,
+      "ci_fallback": [
+        -0.03,
+        0.0225
+      ],
+      "significant_fallback": false
+    },
+    {
+      "label": "step_150",
+      "step": 150,
+      "format_compliance_rate": 0.8819,
+      "pass_at_1_strict": 0.545,
+      "pass_at_1_fallback": 0.6187,
+      "delta_text_strict": 0.0538,
+      "ci_strict": [
+        0.0231,
+        0.0844
+      ],
+      "significant_strict": true,
+      "delta_text_fallback": -0.0225,
+      "ci_fallback": [
+        -0.045,
+        0.0
+      ],
+      "significant_fallback": false
+    },
+    {
+      "label": "step_300",
+      "step": 300,
+      "format_compliance_rate": 0.9056,
+      "pass_at_1_strict": 0.5569,
+      "pass_at_1_fallback": 0.6156,
+      "delta_text_strict": 0.0656,
+      "ci_strict": [
+        0.0406,
+        0.09
+      ],
+      "significant_strict": true,
+      "delta_text_fallback": -0.0256,
+      "ci_fallback": [
+        -0.05,
+        -0.0031
+      ],
+      "significant_fallback": true
+    },
+    {
+      "label": "step_467",
+      "step": 467,
+      "format_compliance_rate": 0.9356,
+      "pass_at_1_strict": 0.5931,
+      "pass_at_1_fallback": 0.6237,
+      "delta_text_strict": 0.1019,
+      "ci_strict": [
+        0.0775,
+        0.1256
+      ],
+      "significant_strict": true,
+      "delta_text_fallback": -0.0175,
+      "ci_fallback": [
+        -0.0406,
+        0.005
+      ],
+      "significant_fallback": false
+    }
+  ],
+  "verdict": "FLAT (format-agnostic): Delta_text at step 467 (-0.0175) is within noise of step 5 (-0.0125), noise=0.0234. Meanwhile format compliance moved 0.7894 -> 0.9356 (+0.1462). A flat reasoning curve alongside a rising compliance curve is the format-compliance signature: the strict metric was tracking formatting."
+}
