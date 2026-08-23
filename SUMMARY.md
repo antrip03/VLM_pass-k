@@ -71,22 +71,22 @@ Same records, same samples, rescored with a format-agnostic extractor
 
 | Condition | Strict Δ pass@1 | Format-agnostic Δ pass@1 |
 |---|---|---|
-| **E (image)** | **+0.0925** [+0.070, +0.116] ✅ | **−0.0109** [−0.025, +0.004] ✗ |
-| **D** | **+0.0719** [+0.056, +0.089] ✅ | **+0.0002** [−0.013, +0.014] ✗ |
-| T (control) | **+0.0587** [+0.041, +0.076] ✅ | **−0.0092** [−0.023, +0.003] ✗ |
+| **E (image)** | **+0.0925** [+0.070, +0.116] ✅ | **-0.0048** [-0.020, +0.011] ✗ |
+| **D** | **+0.0719** [+0.056, +0.089] ✅ | **+0.0052** [-0.009, +0.019] ✗ |
+| T (control) | **+0.0587** [+0.041, +0.076] ✅ | **-0.0069** [-0.021, +0.006] ✗ |
 
 **In raw counts** (6,400 generations per model per condition). "Rescued" =
 correct under fair scoring, discarded by strict:
 
 | model | cond | strict ✓ | fair ✓ | rescued | unparsed |
 |---|---|---|---|---|---|
-| base | E | 3,175 | 4,063 | **+888** | 1,341 |
-| RL | E | 3,767 | 3,993 | +226 | 413 |
-| base | T | 3,897 | 4,471 | +574 | 856 |
-| RL | T | 4,273 | 4,412 | +139 | 264 |
+| base | E | 3,175 | 4,019 | **+844** | 1,341 |
+| RL | E | 3,767 | 3,988 | +221 | 413 |
+| base | T | 3,897 | 4,451 | +554 | 856 |
+| RL | T | 4,273 | 4,407 | +134 | 264 |
 
 Condition T in one line: under strict scoring RL led by **+376
-generations**; under fair scoring it **trails by −59**.
+generations**; under fair scoring it **trails by −44**.
 
 ## 5. The mechanism is modality-dependent — the novel finding
 

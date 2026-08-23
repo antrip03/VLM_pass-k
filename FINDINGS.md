@@ -22,11 +22,12 @@ problems and the same 128 samples per problem.
 
 | Scoring | Δ pass@1 | 95% CI | Significant |
 |---|---|---|---|
-| **Strict** (`#### N` required) | **+0.0555** | [+0.0358, +0.0761] | **YES, positive** |
-| **Format-agnostic** | **−0.0184** | [−0.0316, −0.0058] | **YES, negative** |
+| **Strict** (`#### N` required) | **+0.0587** | [+0.0406, +0.0763] | **YES, positive** |
+| **Format-agnostic** | **−0.0069** | [−0.0208, +0.0064] | no |
 
-Same model, same checkpoint, same problems. Only the answer-extractor
-differs.
+Same model, same checkpoint, same problems, same 128 samples each. Only
+the answer-extractor differs. A significant positive result becomes a
+non-significant null.
 
 ## 1b. The same thing in raw generation counts
 
@@ -36,22 +37,22 @@ strict extractor.
 
 | model | cond | total | strict correct | fair correct | rescued | unparsed |
 |---|---|---|---|---|---|---|
-| base | T | 6,400 | 3,897 | 4,471 | **+574** | 856 |
-| base | D | 6,400 | 3,860 | 4,466 | **+606** | 859 |
-| base | E | 6,400 | 3,175 | 4,063 | **+888** | 1,341 |
-| RL | T | 6,400 | 4,273 | 4,412 | +139 | 264 |
-| RL | D | 6,400 | 4,320 | 4,467 | +147 | 246 |
-| RL | E | 6,400 | 3,767 | 3,993 | +226 | 413 |
+| base | T | 6,400 | 3,897 | 4,451 | **+554** | 856 |
+| base | D | 6,400 | 3,860 | 4,433 | **+573** | 859 |
+| base | E | 6,400 | 3,175 | 4,019 | **+844** | 1,341 |
+| RL | T | 6,400 | 4,273 | 4,407 | **+134** | 264 |
+| RL | D | 6,400 | 4,320 | 4,466 | **+146** | 246 |
+| RL | E | 6,400 | 3,767 | 3,988 | **+221** | 413 |
 
 Condition T, stated as plainly as possible:
 
-- The base model had **574** correct answers thrown away for formatting
-  (9.0% of all its generations).
-- The RL model had **139** thrown away (2.2%).
+- The base model had **554** correct answers thrown away for formatting
+  (8.7% of all its generations).
+- The RL model had **134** thrown away (2.1%).
 - **Under strict scoring RL led by +376 generations. Under
-  format-agnostic scoring RL trails by −59.**
+  format-agnostic scoring RL trails by −44.**
 
-The base model recovered **435 more** generations than RL did. That
+The base model recovered **420 more** generations than RL did. That
 single asymmetry is the entire reported result.
 
 ## 1c. The D/E result — the actual contribution
@@ -70,9 +71,9 @@ by condition:
 
 | cond | base compliance | RL compliance | gap | base rescued | RL rescued | asymmetry |
 |---|---|---|---|---|---|---|
-| T | 0.866 | 0.959 | +0.093 | 574 | 139 | +435 |
-| D | 0.866 | 0.962 | +0.096 | 606 | 147 | +459 |
-| **E** | **0.790** | **0.935** | **+0.145** | **888** | **226** | **+662** |
+| T | 0.866 | 0.959 | +0.093 | 554 | 134 | +420 |
+| D | 0.866 | 0.962 | +0.096 | 573 | 146 | +427 |
+| **E** | **0.790** | **0.935** | **+0.145** | **844** | **221** | **+623** |
 
 The base model follows the output-format instruction ~8 points LESS
 reliably when reading a problem from an image than from text - the
@@ -117,6 +118,13 @@ Base: strict pass@1 = 0.6128, format-agnostic = 0.7072.
 - **Format compliance rises monotonically**: 86.6% → 96.6%
 - **Strict pass@1 tracks it upward**: 0.607 → 0.668
 - **Format-agnostic pass@1 is flat, drifting down**: 0.7005 → 0.6887
+
+> **Extractor version note.** This trajectory's format-agnostic column was
+> computed with the extractor as it stood *before* the 2026-08-23 human
+> review. Re-scoring the main eval with the corrected version shifted Δ by
+> ~+0.005 — within the CI half-width, and it does not change the shape of
+> either curve. The compliance column is unaffected (it depends only on
+> the strict marker).
 
 The strict curve is not measuring capability. It is measuring how often
 the scorer could *read* an answer that was frequently already correct.
