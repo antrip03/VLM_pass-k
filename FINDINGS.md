@@ -167,6 +167,31 @@ because RL's format advantage (89.0% vs 87.5%) partially cancels the
 reasoning loss. The confound manufactures false positives *and* masks
 true negatives.
 
+## 4b. The causal test — manipulating the mediator directly (2026-08-25)
+
+Everything above is observational: compliance and the strict Δ move
+together, which is strong correlational evidence but not proof of
+causation. This test manipulates compliance directly, with **no
+training, no gradient**: base model, condition E, one sentence added to
+the prompt demonstrating the `#### N` marker line (a bare format
+exemplar — not a worked-example few-shot, which would also prime
+reasoning style and confound the test).
+
+| | Compliance | Strict Δ (vs RL) | Significant |
+|---|---|---|---|
+| Zero-shot base → RL | 77.9% → 93.2% (gap 15.3pp) | **+0.1028** | **yes** |
+| Few-shot base → RL | 88.3% → 93.2% (gap 4.8pp) | **+0.0162** | **no** |
+
+One line of prompt text closed 68% of the compliance gap and collapsed
+the "significant" strict gain from +10.3 points to +1.6, losing
+significance along with the compliance gap. Format-agnostic (reasoning)
+accuracy was unaffected by the manipulation (+0.019, not significant,
+[−0.003, +0.041]) — confirming the exemplar changed formatting only.
+
+**This converts the paper's central claim from correlational to causal.**
+Reproduce: `scripts/run_compliance_matching_control.py` +
+`scripts/analyze_compliance_control.py`.
+
 ## 5. Why this does not contradict the literature
 
 | | Yue et al. | MIRROR | **This work** |
