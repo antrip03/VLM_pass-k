@@ -57,6 +57,36 @@ def build_image_prompt() -> str:
     return E_CONDITION_INSTRUCTION
 
 
+# Compliance-matching causal control (2026-08-25, mentor review item 8):
+# "few-shot prompt the base model until its compliance matches the RL
+# model's, then re-measure strict Delta. If it collapses, you've
+# manipulated the mediator and eliminated the effect."
+#
+# THIS IS A FORMAT EXEMPLAR, NOT A WORKED-EXAMPLE FEW-SHOT. Deliberately
+# so: a full solved example (a different problem, fully reasoned through)
+# would also prime reasoning STYLE, confounding the manipulation - a
+# change in strict Delta could then be "the model imitated the exemplar's
+# reasoning" rather than "the model became more compliant". Adding one
+# concrete instance of the MARKER LINE ONLY, with no worked reasoning,
+# isolates format compliance as the sole thing being manipulated.
+E_CONDITION_INSTRUCTION_FEWSHOT = (
+    E_CONDITION_INSTRUCTION
+    + "\n\nFor example, if the answer were 42, the final line of your "
+    "response would be exactly:\n#### 42"
+)
+
+
+def build_image_prompt_fewshot() -> str:
+    """
+    Condition E, format-exemplar variant. Same content instruction as
+    build_image_prompt(); adds only a concrete example of the marker
+    line. Used solely to test whether raising compliance alone (with no
+    training, no content change) collapses the strict Delta - see the
+    module docstring above E_CONDITION_INSTRUCTION_FEWSHOT.
+    """
+    return E_CONDITION_INSTRUCTION_FEWSHOT
+
+
 def build_transcribe_prompt() -> str:
     """Condition D (PLAN.md Section 1.7, Decomposed), step 1: transcribe-only."""
     return D_TRANSCRIBE_INSTRUCTION

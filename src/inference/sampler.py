@@ -257,10 +257,19 @@ def sample_condition_e(
     max_new_tokens: int = DEFAULT_SOLVE_MAX_TOKENS,
     temperature: float = DEFAULT_TEMPERATURE,
     image_chunk: int = DEFAULT_IMAGE_CHUNK,
+    instruction_override: str | None = None,
 ) -> list[SampleResult]:
-    """Condition E: n samples, image shown, perceive+reason in one pass."""
+    """
+    Condition E: n samples, image shown, perceive+reason in one pass.
+
+    instruction_override: for the compliance-matching causal control
+    (2026-08-25) - pass build_image_prompt_fewshot() to test whether
+    raising format compliance alone, with no training and no content
+    change, collapses the strict Delta. None (default) uses the standard
+    instruction, unchanged from every prior Phase 1/1b run.
+    """
     image = render_problem_image(question)
-    instruction = build_image_prompt()
+    instruction = instruction_override or build_image_prompt()
     completions = _generate_image_batch(
         model, processor, image, instruction, n, max_new_tokens, temperature, image_chunk=image_chunk
     )
