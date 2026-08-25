@@ -117,7 +117,12 @@ Base: strict pass@1 = 0.6128, format-agnostic = 0.7072.
 
 - **Format compliance rises monotonically**: 86.6% → 96.6%
 - **Strict pass@1 tracks it upward**: 0.607 → 0.668
-- **Format-agnostic pass@1 is flat, drifting down**: 0.7005 → 0.6887
+- **Format-agnostic pass@1 is flat, drifting down**: 0.7005 → 0.6887 —
+  **but whether the step-467 decline is statistically significant
+  depends on which of two independent base-model runs is used as the
+  comparator (0.7072 here vs 0.6955 in the main eval); see §4f for the
+  full, honest treatment. Do not quote "significant decline" without
+  that caveat.**
 
 > **Extractor version note.** This trajectory's format-agnostic column was
 > computed with the extractor as it stood *before* the 2026-08-23 human
@@ -192,6 +197,123 @@ accuracy was unaffected by the manipulation (+0.019, not significant,
 Reproduce: `scripts/run_compliance_matching_control.py` +
 `scripts/analyze_compliance_control.py`.
 
+## 4c. A measurement model, and an out-of-sample test of it (2026-08-25)
+
+Second mentor review. Let c = P(a completion is parseable), a =
+format-agnostic accuracy. Strict accuracy ~= c*a, so to first order:
+
+    Delta_strict ~= c_bar * Delta_a + a_bar * Delta_c
+
+| cond | c_bar*Delta_a | a_bar*Delta_c | predicted | observed | error |
+|---|---|---|---|---|---|
+| T | -0.0063 | +0.0643 | +0.0580 | +0.0587 | 0.0007 |
+| D | +0.0048 | +0.0662 | +0.0710 | +0.0719 | 0.0009 |
+| E | -0.0041 | +0.0907 | +0.0866 | +0.0925 | 0.0059 |
+
+Predicts the observed strict Delta to within 0.001-0.006 in all three
+conditions, including the D-vs-T case a pure rank-ordering argument could
+not explain (D and T have nearly identical compliance gaps, 0.096 vs
+0.093, but different strict Delta, 0.072 vs 0.059 - the a_bar*Delta_c
+term, driven by D's higher base accuracy, explains this).
+
+**Out-of-sample test.** The equation above was fit to the observational
+T/D/E data. Using ONLY the zero-shot operating point from the
+compliance-matching control (c_bar=0.9073, a_bar=0.6380, measured BEFORE
+the exemplar was ever run) and the exemplar's own measured effect
+(Delta_c=+0.0484, Delta_a=-0.0197):
+
+    predicted Delta_strict = 0.9073*(-0.0197) + 0.6380*0.0484 = +0.0130
+    observed  Delta_strict = +0.0162   (error 0.0032)
+
+This is a genuine out-of-sample prediction: the causal control (section
+4b) was designed to test the mechanism, not to validate this equation,
+and the equation's parameters were fixed before that experiment's result
+was computed. Predicting a held-out intervention to within 0.3pp is
+stronger evidence than the observational fit alone.
+
+## 4d. Tipping-point analysis: how wrong would the extractor have to be?
+
+Second mentor review. Rather than defend the fallback extractor's
+precision directly, ask how large its error would need to be to change
+the conclusion - answerable from raw counts alone, no extractor accuracy
+claim required.
+
+With S = strict lead (generations), R_b/R_r = base/RL rescued-generation
+counts, the fraction f of base's rescues that must be false positives to
+bring the fair delta to exactly zero is f = 1 - (S+R_r)/R_b.
+
+| cond | S | R_b | R_r | f to fully restore strict lead | f to erase the fair lead |
+|---|---|---|---|---|---|
+| T | 376 | 554 | 134 | 75.8% | 7.9% |
+| E | 592 | 844 | 221 | 73.8% | 3.7% |
+| D | 460 | 573 | 146 | 74.5% | n/a - RL still leads under fair scoring |
+
+Reversing the T/E null requires roughly three-quarters of base's rescued
+answers to be false positives. The independent human review (section 4e
+below and the extraction-review files) measured a held-out error rate an
+order of magnitude below that (~11-13%). The residual sign is more
+fragile - only 4-8% of base's rescues need to be spurious to erase the
+fair lead entirely - but the headline reversal is not sensitive to
+extractor precision at any plausible error rate.
+
+D runs the other direction: only 22.6% of RL's own 146 rescues would need
+to be spurious to erase D's small remaining fair-scored lead - the least
+robust of the three conditions, consistent with D showing the weakest
+pattern throughout this project's analysis.
+
+## 4e. A real bug found by the second mentor review, and fixed
+
+`src/analysis/extractor_robustness.py`'s "strict" arm was normalizing
+numbers before comparing them ("7.0" == "7" -> true). Every OTHER
+"strict" number in this project - including the real training reward -
+uses raw string equality (`is_correct()` in
+`src/metrics/answer_extraction.py`), with no such normalization. A
+correct answer written "7.0" instead of "7" was scored WRONG by the real
+training reward and by every eval in this project, but scored RIGHT by
+this one sweep - two different metrics sharing one label (145/6400 rows
+affected in condition T alone). Fixed by routing the "strict" arm through
+`is_correct()` directly; the multi-extractor sweep was re-run and its
+numbers now match sections 1-1c exactly. See `eval_results/extractor_robustness.json`.
+
+**The sweep's honest reading, corrected.** Not every format-blind
+extractor is non-significant (an earlier draft claimed this and was
+wrong): `last_line_naive` is significant in E/D/T and `verl_flexible` in
+D. The finding is not that any single lenient extractor is "right" - it
+is that the measured Delta ranges from +0.0925 (strict) to +0.0000
+(gt_in_tail, the maximally generous reading) purely as a function of
+which extractor scores the identical completions. That range is the
+result. `gt_in_tail` is not a valid upper bound on Delta (a difference of
+two upper-bounded quantities is not itself upper-bounded) - reported as
+one more data point in the range, not a bound on the others.
+
+## 4f. Two things this review's checking could not fully resolve
+
+**Comparator-dependent significance (the most serious open item).** Two
+independent n=128 evaluations of the SAME frozen base checkpoint give
+0.6955 and 0.7072 fair pass@1 - a 1.17pp difference. Compared against
+RL's step-467 result (stable at 0.6886-0.6887 across both comparisons),
+this flips the format-agnostic Delta's significance verdict: -0.0069 n.s.
+(main-eval comparator) vs -0.0184 significant (trajectory-sweep
+comparator). Both are reported in section 2 above. The defensible claim:
+format-agnostic Delta is small and consistently non-positive across both
+measurements; whether it is exactly zero or a small further decline
+cannot be resolved at this sample size, because between-run base-rate
+variance is comparable in magnitude to the effect and is NOT captured by
+the problem-level bootstrap CI (which reflects within-run sampling noise
+only).
+
+**Data loss discovered while investigating the above.** All six raw
+per-generation parquets backing the original trajectory sweep (base +
+five checkpoints) were found to have been silently overwritten on the
+Modal results volume by a since-fixed filename-collision bug (a crashed
+E-condition attempt wrote to the same untagged path before the fix was
+deployed). Only the six checkpoints' aggregate JSON summaries survive
+(already committed). This means the ideal resolution - pooling both base
+runs at the per-generation level for one tighter estimate - is not
+possible with what remains. Disclosed rather than silently worked around;
+the two surviving aggregate numbers are the most precise statement this
+data supports.
+
 ## 5. Why this does not contradict the literature
 
 | | Yue et al. | MIRROR | **This work** |
@@ -241,12 +363,19 @@ distort pass@1.
 
 ## Limitations, to state rather than bury
 
-1. **Extraction validation is not independent.** The fallback extractor
-   was written and then hand-validated by the same agent. Held-out
-   marker-stripped recovery is 87.4% (base) / 89.0% (RL), symmetric and
-   slightly favouring RL — i.e. working *against* the collapse. **A human
-   spot-check of ~20 traces is still required before publication.**
-2. **Single seed**; CIs reflect sampling noise only.
+1. **Extraction validation — partly independent (updated 2026-08-25).**
+   A human reviewer, blind to extractor output, labelled 20 traces:
+   100% agreement on every unambiguous case, 17/20 (85%) overall after
+   fixing three real defects the review exposed. Re-scoring with the
+   fixes moved every headline Δ by less than the CI half-width. Held-out
+   marker-stripped recovery: 87.4% (base) / 89.0% (RL), symmetric. One
+   rater; no inter-rater κ computed (a second person's answers were not
+   recorded per-trace).
+2. **Single seed**; CIs reflect sampling noise only *within* a run. This
+   understates real uncertainty: two independent n=128 evaluations of
+   the identical, untrained base checkpoint differ by 1.17pp on fair
+   pass@1 — enough to flip a significance verdict on the step-467
+   trajectory result. See §4f.
 3. **Negative transfer rests on one OOD dataset** (MATH-500). Say "we
    observe negative transfer on MATH-500", not "RLVR causes negative
    transfer".
@@ -256,6 +385,13 @@ distort pass@1.
    problems). At n=64 the estimator degenerates to "was this ever
    solved", a proportion over 20 items. Screens are adequate for pass@1,
    not pass@k.
+6. **Raw per-generation records for the original trajectory sweep were
+   lost** (§4f) — a since-fixed filename-collision bug overwrote all six
+   checkpoint parquets on the Modal volume before the fix was deployed.
+   Only aggregate summaries survive. Affects only the trajectory sweep;
+   the main eval, Run A, MATH-500, and the causal control's raw records
+   are all intact and were used directly for every other result in this
+   document.
 
 ## Reproduce
 

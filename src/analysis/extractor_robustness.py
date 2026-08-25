@@ -49,6 +49,7 @@ from __future__ import annotations
 import re
 
 from src.metrics.answer_extraction import extract_model_answer as _strict
+from src.metrics.answer_extraction import is_correct
 from src.metrics.answer_extraction_fallback import (
     extract_with_fallback as _fallback,
 )
@@ -135,6 +136,25 @@ def score_with_all(df, extractors=None):
     """
     Add one boolean column per extractor to a records DataFrame.
     Returns (df, column_names).
+
+    BUG FIXED 2026-08-25 (mentor review, item A1): every extractor's
+    comparison was being run through normalize_number(), INCLUDING
+    "strict". That silently changed what "strict" means: the real
+    training reward and every other "strict" number in this project
+    (src/metrics/answer_extraction.is_correct) use RAW STRING EQUALITY,
+    no numeric normalization - so a correct answer written "7.0" instead
+    of "7" scored WRONG throughout training and every prior eval. Running
+    that same completion through this module's normalized comparison
+    instead scored it correct, so "strict" here (0.6316 base/T) silently
+    diverged from "strict" everywhere else (0.6089 base/T) - 145/6400
+    rows in condition T alone. Two different metrics sharing one label.
+
+    Fixed by scoring "strict" with is_correct() directly - the exact
+    function that determined the real training reward - and reserving
+    normalized comparison for the extractors that are EXPLICITLY meant to
+    be numerically lenient (verl_flexible, last_line_naive, fallback_chain,
+    gt_in_tail). "strict" is no longer a name in EXTRACTORS with its own
+    comparison rule call site; it is real is_correct() and nothing else.
     """
     extractors = extractors or EXTRACTORS
     cols = []
@@ -145,6 +165,13 @@ def score_with_all(df, extractors=None):
     for name, fn in extractors.items():
         col = f"ok__{name}"
         flags = []
+        if name == "strict":
+            # Byte-for-byte the same check that produced every other
+            # "strict" number in this project - see docstring above.
+            flags = [is_correct(c, g) for c, g in zip(comp, gts)]
+            df[col] = flags
+            cols.append(col)
+            continue
         for c, g, ng in zip(comp, gts, norm_gt):
             # Call the extractor ONCE per row. The earlier version called
             # it twice (once for the None test, once for the comparison),

@@ -9,12 +9,12 @@
   "per_condition": {
     "E": {
       "strict": {
-        "base_pass_at_1": 0.5266,
-        "rl_pass_at_1": 0.6259,
-        "delta": 0.0994,
+        "base_pass_at_1": 0.4961,
+        "rl_pass_at_1": 0.5886,
+        "delta": 0.0925,
         "ci": [
-          0.0761,
-          0.1231
+          0.0695,
+          0.1161
         ],
         "significant": true
       },
@@ -39,12 +39,12 @@
         "significant": true
       },
       "fallback_chain": {
-        "base_pass_at_1": 0.6653,
-        "rl_pass_at_1": 0.6612,
-        "delta": -0.0041,
+        "base_pass_at_1": 0.6584,
+        "rl_pass_at_1": 0.6605,
+        "delta": 0.002,
         "ci": [
-          -0.0161,
-          0.0087
+          -0.0117,
+          0.0164
         ],
         "significant": false
       },
@@ -58,16 +58,16 @@
         ],
         "significant": false
       },
-      "_verdict": "MIXED: permissive extractors disagree (1/4 significant, spread 0.0218). No conclusion is safe from any single one - manual review is required, not optional."
+      "_verdict": "MIXED: permissive extractors disagree (1/4 significant, spread 0.0177). No conclusion is safe from any single one - manual review is required, not optional."
     },
     "D": {
       "strict": {
-        "base_pass_at_1": 0.6267,
-        "rl_pass_at_1": 0.7031,
-        "delta": 0.0764,
+        "base_pass_at_1": 0.6031,
+        "rl_pass_at_1": 0.675,
+        "delta": 0.0719,
         "ci": [
-          0.0602,
-          0.0934
+          0.0558,
+          0.0889
         ],
         "significant": true
       },
@@ -92,12 +92,12 @@
         "significant": true
       },
       "fallback_chain": {
-        "base_pass_at_1": 0.7214,
-        "rl_pass_at_1": 0.7261,
-        "delta": 0.0047,
+        "base_pass_at_1": 0.7162,
+        "rl_pass_at_1": 0.7259,
+        "delta": 0.0097,
         "ci": [
-          -0.0078,
-          0.0177
+          -0.0036,
+          0.0234
         ],
         "significant": false
       },
@@ -111,16 +111,16 @@
         ],
         "significant": false
       },
-      "_verdict": "MIXED: permissive extractors disagree (2/4 significant, spread 0.0355). No conclusion is safe from any single one - manual review is required, not optional."
+      "_verdict": "MIXED: permissive extractors disagree (2/4 significant, spread 0.0308). No conclusion is safe from any single one - manual review is required, not optional."
     },
     "T": {
       "strict": {
-        "base_pass_at_1": 0.6316,
-        "rl_pass_at_1": 0.6981,
-        "delta": 0.0666,
+        "base_pass_at_1": 0.6089,
+        "rl_pass_at_1": 0.6677,
+        "delta": 0.0587,
         "ci": [
-          0.0486,
-          0.0839
+          0.0406,
+          0.0763
         ],
         "significant": true
       },
@@ -145,12 +145,12 @@
         "significant": true
       },
       "fallback_chain": {
-        "base_pass_at_1": 0.7212,
-        "rl_pass_at_1": 0.7198,
-        "delta": -0.0014,
+        "base_pass_at_1": 0.7181,
+        "rl_pass_at_1": 0.7191,
+        "delta": 0.0009,
         "ci": [
-          -0.0125,
-          0.0094
+          -0.0108,
+          0.0123
         ],
         "significant": false
       },
@@ -164,7 +164,7 @@
         ],
         "significant": false
       },
-      "_verdict": "MIXED: permissive extractors disagree (1/4 significant, spread 0.0397). No conclusion is safe from any single one - manual review is required, not optional."
+      "_verdict": "MIXED: permissive extractors disagree (1/4 significant, spread 0.0374). No conclusion is safe from any single one - manual review is required, not optional."
     }
   }
 }
