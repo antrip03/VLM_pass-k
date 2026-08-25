@@ -1,0 +1,19 @@
+{
+  "compliance": {
+    "zero-shot base": 0.77875,
+    "few-shot  base": 0.8831249999999999,
+    "zero-shot RL  ": 0.9315625
+  },
+  "compliance_gap_to_rl": {
+    "zero_shot": 0.1528124999999999,
+    "few_shot": 0.04843750000000002
+  },
+  "exemplar_effect_on_reasoning": {
+    "delta": 0.018749999999999933,
+    "ci": [
+      -0.0028124999999999956,
+      0.041257812500000005
+    ],
+    "significant": false
+  }
+}

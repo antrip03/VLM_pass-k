@@ -58,10 +58,21 @@ def compliance(df: pd.DataFrame) -> float:
 
 
 def main() -> None:
-    fewshot = pd.read_parquet(FEWSHOT_PATH)
-    zeroshot_base = pd.read_parquet("eval_results/records_base.fallback.parquet")
+    # Two naming conventions collide here: records_{base,rl}.fallback.parquet
+    # (produced by rescore_with_fallback.py, pre-dating the SamplingRecord
+    # schema change) uses "correct_fb"; the new run uses SamplingRecord's
+    # "correct_fallback" directly. Normalise to one name rather than
+    # touching either historical data file.
+    def load_normalized(path: str) -> pd.DataFrame:
+        df = pd.read_parquet(path)
+        if "correct_fb" in df.columns and "correct_fallback" not in df.columns:
+            df = df.rename(columns={"correct_fb": "correct_fallback"})
+        return df
+
+    fewshot = load_normalized(FEWSHOT_PATH)
+    zeroshot_base = load_normalized("eval_results/records_base.fallback.parquet")
     zeroshot_base = zeroshot_base[zeroshot_base.condition == CONDITION]
-    zeroshot_rl = pd.read_parquet("eval_results/records_rl.fallback.parquet")
+    zeroshot_rl = load_normalized("eval_results/records_rl.fallback.parquet")
     zeroshot_rl = zeroshot_rl[zeroshot_rl.condition == CONDITION]
 
     # zeroshot records are n=128, fewshot is n=64 - subsample zeroshot to
@@ -70,7 +81,11 @@ def main() -> None:
     # discard information asymmetrically: 64 of 128 is a fair, fixed
     # subsample, not a cherry-pick.
     def first_n(df: pd.DataFrame, n: int) -> pd.DataFrame:
-        return df.groupby("problem_idx", group_keys=False).apply(lambda g: g.head(n))
+        # .apply(group_keys=False) silently drops problem_idx under some
+        # pandas versions when the lambda returns a slice of the group -
+        # sort + groupby().head() instead, which is documented to keep
+        # all original columns intact.
+        return df.sort_values(["problem_idx", "sample_idx"]).groupby("problem_idx").head(n).reset_index(drop=True)
 
     zeroshot_base_64 = first_n(zeroshot_base, 64)
     zeroshot_rl_64 = first_n(zeroshot_rl, 64)
