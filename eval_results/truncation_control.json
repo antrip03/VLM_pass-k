@@ -1,0 +1,61 @@
+{
+  "generation_cap": 1200,
+  "truncation_margin": 15,
+  "by_condition": {
+    "base/T": {
+      "total": 6400,
+      "unparsed": 856,
+      "truncated_among_unparsed": 3,
+      "truncated_pct_of_unparsed": 0.35,
+      "compliance_raw": 0.8662,
+      "compliance_eos_only": 0.8667
+    },
+    "base/D": {
+      "total": 6400,
+      "unparsed": 859,
+      "truncated_among_unparsed": 2,
+      "truncated_pct_of_unparsed": 0.23,
+      "compliance_raw": 0.8658,
+      "compliance_eos_only": 0.8661
+    },
+    "base/E": {
+      "total": 6400,
+      "unparsed": 1341,
+      "truncated_among_unparsed": 2,
+      "truncated_pct_of_unparsed": 0.15,
+      "compliance_raw": 0.7905,
+      "compliance_eos_only": 0.7907
+    },
+    "rl/T": {
+      "total": 6400,
+      "unparsed": 264,
+      "truncated_among_unparsed": 0,
+      "truncated_pct_of_unparsed": 0.0,
+      "compliance_raw": 0.9587,
+      "compliance_eos_only": 0.9587
+    },
+    "rl/D": {
+      "total": 6400,
+      "unparsed": 246,
+      "truncated_among_unparsed": 2,
+      "truncated_pct_of_unparsed": 0.81,
+      "compliance_raw": 0.9616,
+      "compliance_eos_only": 0.9619
+    },
+    "rl/E": {
+      "total": 6400,
+      "unparsed": 413,
+      "truncated_among_unparsed": 1,
+      "truncated_pct_of_unparsed": 0.24,
+      "compliance_raw": 0.9355,
+      "compliance_eos_only": 0.9356
+    }
+  },
+  "verdict": "E-vs-T compliance gap SURVIVES on EOS-only generations (E=+0.1449 vs T=+0.0920 raw; E=+0.1449 vs T=+0.0920 EOS-only).",
+  "describes_instead_of_solves": {
+    "matched": 0,
+    "total_unparsed_base_e": 1341,
+    "fraction": 0.0,
+    "sample_matches": []
+  }
+}

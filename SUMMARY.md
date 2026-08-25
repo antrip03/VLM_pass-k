@@ -200,7 +200,7 @@ published number. It was never run.
 |---|---|
 | **Published** (Qwen2.5-VL-3B) | **77.7%** |
 | Our strict scoring | **60.9%** ← 17 points low ❌ |
-| Our format-agnostic scoring | **69.9%** ← 8 points low ✅ |
+| Our format-agnostic scoring | **69.6%** ← 8 points low ✅ |
 
 Also: **the artifact scales inversely with difficulty** (strict/fair gap
 9.0 → 6.7 → 2.2 points across GSM8K → GSM-Plus → MATH-500). It bites
@@ -241,9 +241,13 @@ only ever distort pass@1.
 - On this model and benchmark, a format-coupled extractor reports a
   significant gain where format-agnostic scoring of the same checkpoints
   reports no gain (GSM8K, GSM-Plus) or a significant decline (MATH-500).
-- The artifact is **larger in image conditions**, because reading from an
-  image degrades instruction-following. This is VLM-specific and cannot
-  appear in the text-only RLVR literature.
+- The artifact **scales with the base model's format-compliance gap**,
+  and reading a problem from an image is one condition that widens that
+  gap (base compliance 79.0% on images vs 86.6% on text). This is *not*
+  claimed to be exclusive to VLMs — the same mechanism should appear
+  wherever base-model compliance is depressed (long context, low-resource
+  language, noisy OCR text). What is specific to this design is that
+  *modality* is the axis we controlled and measured it on.
 - The apparent cross-modal transfer, its magnitude ordering, and the
   difficulty-matched defence of that ordering all dissolve under
   format-agnostic scoring.

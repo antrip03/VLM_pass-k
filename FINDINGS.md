@@ -191,7 +191,7 @@ published number. It was never run. Running it now:
 |---|---|
 | **Published** (Qwen2.5-VL-3B) | **77.7%** |
 | Strict scoring | **60.9%** ← 17 points low ❌ |
-| Format-agnostic | **69.9%** ← 8 points low ✅ |
+| Format-agnostic | **69.6%** ← 8 points low ✅ |
 
 A 17-point gap against a published number is a two-minute red flag.
 
